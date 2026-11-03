@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
   <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet">
-  <link href="css/pixel.css?v=13" rel="stylesheet">
+  <link href="css/pixel.css?v=14" rel="stylesheet">
 </head>
 <body>
 
@@ -40,7 +40,7 @@
       <div class="panel p-avatar">
         <div class="panel-label"><span>Player</span><span class="hot">P1</span></div>
         <img class="avatar" src="img/isabel-portrait.jpg?v=3" alt="Pixel-art portrait of Isabel Chen with her three hamsters" width="600" height="800">
-        <span class="player">♥ READY</span>
+        <span class="player">READY</span>
       </div>
 
       <div class="panel p-matrix now">
@@ -312,7 +312,7 @@
 
   </main>
 
-  <footer>© <span id="year">2026</span> Isabel Chen · made with <span class="heart">♥</span></footer>
+  <footer>© <span id="year">2026</span> Isabel Chen</footer>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -320,7 +320,7 @@
     <span class="play"></span>
     <span class="time" id="time">0:00 / 3:25</span>
     <div class="track"><span id="progress"></span></div>
-    <span>♥ isabel_chen.wav</span>
+    <span>isabel_chen.wav</span>
   </div>
 
   <script src="js/eq-data.js?v=1"></script>
@@ -416,8 +416,8 @@
       }
       btn.addEventListener('click', function () {
         var email = btn.getAttribute('data-email');
-        var done = function () { show('♥ Copied ' + email); };
-        var fail = function () { show(fallbackCopy(email) ? '♥ Copied ' + email : '✉ ' + email); };
+        var done = function () { show('Copied ' + email); };
+        var fail = function () { show(fallbackCopy(email) ? 'Copied ' + email : email); };
         if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(email).then(done, fail);
         else fail();
       });
