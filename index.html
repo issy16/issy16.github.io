@@ -39,7 +39,10 @@
     <section id="about" class="hero">
       <div class="panel p-avatar">
         <div class="panel-label"><span>Player</span><span class="hot">P1</span></div>
-        <img class="avatar" src="img/isabel-portrait.jpg" alt="Portrait of Isabel Chen" width="160" height="160">
+        <button class="avatar-swap" type="button" aria-label="Switch photo background" aria-pressed="false">
+          <img class="avatar" src="img/isabel-pixel-pink.png" alt="Pixel-style portrait of Isabel Chen" width="160" height="160">
+          <img class="avatar alt" src="img/isabel-pixel-garden.png" alt="" width="160" height="160" aria-hidden="true">
+        </button>
         <span class="player">♥ READY</span>
       </div>
 
@@ -292,6 +295,11 @@
 
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Tap the portrait to swap between pink and garden backgrounds
+    document.querySelector('.avatar-swap').addEventListener('click', function () {
+      this.setAttribute('aria-pressed', this.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+    });
 
     // Oscilloscope wave (decorative)
     (function () {
