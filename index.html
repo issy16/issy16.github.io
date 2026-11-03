@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
   <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet">
-  <link href="css/pixel.css?v=12" rel="stylesheet">
+  <link href="css/pixel.css?v=13" rel="stylesheet">
 </head>
 <body>
 
@@ -325,6 +325,39 @@
 
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Now Playing equalizer: simulated spectrum of a mellow ~112 BPM song.
+    // Low bars kick on the beat, mids follow the snare and melody, highs shimmer on the hi-hats.
+    (function () {
+      var bars = [].slice.call(document.querySelectorAll('.eq i'));
+      if (!bars.length || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var n = bars.length, beat = 60 / 112, cur = bars.map(function () { return 0.3; });
+      var seeds = bars.map(function (_, i) { return { f1: 0.7 + i * 0.23, f2: 1.9 + i * 0.41, p: i * 1.7 }; });
+      var visible = true, start = performance.now();
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (e) { visible = e[0].isIntersecting; }).observe(bars[0].parentNode);
+      }
+      function frame(ts) {
+        requestAnimationFrame(frame);
+        if (!visible) return;
+        var t = (ts - start) / 1000, b = t / beat, k = Math.floor(b), ph = b - k;
+        var kick = Math.exp(-ph * 5.5);
+        var snare = (k % 2 === 1) ? Math.exp(-ph * 7) : 0;
+        var hat = Math.exp(-((b * 2) % 1) * 9);
+        var bar4 = Math.floor(k / 4) % 4;                      // a little variation every 4 beats
+        var swell = 0.85 + 0.15 * Math.sin(t * 0.35);          // song breathes slowly
+        for (var i = 0; i < n; i++) {
+          var x = i / (n - 1), s = seeds[i];
+          var low = Math.max(0, 1 - x * 2.2), mid = Math.max(0, 1 - Math.abs(x - 0.5) * 3), high = Math.max(0, x * 1.6 - 0.6);
+          var melody = 0.5 + 0.5 * Math.sin(t * s.f1 + s.p + bar4) * Math.sin(t * s.f2 * 0.5 + s.p);
+          var target = 0.06 + (kick * 0.85 * low + snare * 0.6 * mid + hat * 0.4 * high + melody * 0.3) * swell;
+          target = Math.min(1, target);
+          cur[i] += (target - cur[i]) * (target > cur[i] ? 0.45 : 0.07);   // fast attack, slow fall
+          bars[i].style.height = (8 + cur[i] * 92).toFixed(1) + '%';
+        }
+      }
+      requestAnimationFrame(frame);
+    })();
 
     // Experience timeline: Jan 2023 -> a few months past today, NOW line on today's date
     (function () {
