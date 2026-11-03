@@ -134,7 +134,21 @@ a.key:active { transform: translateY(2px); box-shadow: none; }
 .eq i:nth-child(9) { animation-delay: -.5s; } .eq i:nth-child(10) { animation-delay: -1s; }
 @keyframes eq { 0% { height: 15%; } 50% { height: 90%; } 100% { height: 40%; } }
 .now-status { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-family: var(--mono); font-weight: 600; font-size: 16px; }
-.led { width: 10px; height: 10px; border-radius: 50%; background: #2fbf71; box-shadow: 0 0 0 3px #cdeedb; flex: none; }
+.led {
+  position: relative; width: 11px; height: 11px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 35% 35%, #d9ffe9 0 18%, #4fe08f 45%, #23a95e 100%);
+  box-shadow: 0 0 4px 1px rgba(63, 214, 128, .9), 0 0 12px 4px rgba(63, 214, 128, .45), 0 0 22px 8px rgba(63, 214, 128, .18);
+  animation: led-glow 2.4s ease-in-out infinite;
+}
+.led::before, .led::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  border: 2px solid rgba(63, 214, 128, .7); animation: led-ring 2.4s ease-out infinite;
+}
+.led::after { animation-delay: 1.2s; }
+@keyframes led-ring { 0% { transform: scale(1); opacity: .9; } 100% { transform: scale(3.2); opacity: 0; } }
+@keyframes led-glow {
+  50% { box-shadow: 0 0 6px 2px rgba(63, 214, 128, 1), 0 0 16px 6px rgba(63, 214, 128, .55), 0 0 30px 12px rgba(63, 214, 128, .22); }
+}
 .now-sub { margin: 0 0 6px; font-size: 14px; color: var(--muted); }
 .now-list { list-style: none; margin: 0; padding: 0; font-size: 14px; }
 .now-list li { padding: 3px 0 3px 16px; position: relative; border-top: 1px dashed var(--grid); }
@@ -157,25 +171,34 @@ a.key:active { transform: translateY(2px); box-shadow: none; }
 .score b em { font-style: normal; color: var(--pink-ink); }
 
 /* ---------- piano roll ---------- */
-.roll { padding: 34px 12px 12px; }
-.roll-grid { position: relative; display: grid; grid-template-columns: 64px 1fr; }
-.roll-years { grid-column: 2; display: grid; grid-template-columns: repeat(4, 1fr); font-family: var(--label); font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); }
-.roll-years span { padding: 0 0 4px 6px; border-left: 1px solid var(--line); }
-.roll-row { display: contents; }
-.roll-key { font-family: var(--label); font-size: 11px; color: var(--muted); padding: 7px 6px 7px 0; border-bottom: 1px solid var(--grid); text-transform: uppercase; white-space: nowrap; }
+.roll { padding: 34px 12px 12px; --key: 72px; --mw: 22px; }
+.roll-scroll { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: var(--pink-2) transparent; padding-bottom: 6px; }
+.roll-scroll::-webkit-scrollbar { height: 8px; }
+.roll-scroll::-webkit-scrollbar-thumb { background: var(--pink-2); }
+.roll-grid { position: relative; width: calc(var(--key) + var(--months, 48) * var(--mw)); }
+.roll-head, .roll-row { display: flex; }
+.roll-row { border-bottom: 1px solid var(--grid); }
+.roll-corner { flex: none; width: var(--key); position: sticky; left: 0; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line); }
+.roll-years { display: flex; flex: none; font-family: var(--label); font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); }
+.roll-years span { flex: none; width: calc(var(--n) * var(--mw)); padding: 0 0 4px 6px; border-left: 1px solid var(--line); overflow: hidden; }
+.roll-key {
+  flex: none; width: var(--key); position: sticky; left: 0; z-index: 2; background: var(--panel);
+  font-family: var(--label); font-size: 11px; color: var(--muted); padding: 7px 6px 7px 0;
+  box-shadow: 1px 0 0 var(--line); text-transform: uppercase; white-space: nowrap;
+}
 .roll-lane {
-  position: relative; border-bottom: 1px solid var(--grid); min-height: 32px;
+  position: relative; flex: none; width: calc(var(--months, 48) * var(--mw)); min-height: 32px;
   background-image: linear-gradient(90deg, var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-  background-size: 25% 100%, 6.25% 100%;
+  background-size: calc(12 * var(--mw)) 100%, calc(3 * var(--mw)) 100%;
 }
 .note {
-  position: absolute; top: 9px; height: 13px; left: var(--s); width: var(--w); min-width: 6px;
+  position: absolute; top: 9px; height: 13px; left: calc(var(--s) * var(--mw)); width: calc(var(--w) * var(--mw)); min-width: 6px;
   background: var(--pink); border: 1px solid var(--pink-ink); border-radius: 2px;
 }
 .note.soft { background: var(--pink-2); border-color: var(--pink); }
 .note span { position: absolute; left: calc(100% + 6px); top: -3px; font-size: 12px; white-space: nowrap; color: var(--ink); }
 .note.flip span { left: auto; right: calc(100% + 6px); }
-.playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); left: calc(64px + (100% - 64px) * var(--p)); }
+.playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); z-index: 1; left: calc(var(--key) + var(--p) * var(--mw)); }
 .playhead::before { content: "NOW"; position: absolute; top: -2px; left: 5px; font-family: var(--label); font-size: 10px; color: var(--ink); }
 
 /* ---------- cards ---------- */
@@ -226,7 +249,8 @@ footer .heart { color: var(--pink); }
 @keyframes blink { 50% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .cursor, .eq i { animation: none; }
+  .cursor, .eq i, .led, .led::before, .led::after { animation: none; }
+  .led::before, .led::after { display: none; }
   .eq i:nth-child(3n) { height: 70%; } .eq i:nth-child(3n+1) { height: 45%; }
 }
 
@@ -238,9 +262,7 @@ footer .heart { color: var(--pink); }
   body { font-size: 15px; }
   .stats-grid { grid-template-columns: 1fr; }
   .hero { grid-template-columns: 1fr; grid-template-areas: "avatar" "about" "matrix" "stats" "scope"; }
-  .roll-grid { grid-template-columns: 44px 1fr; }
-  .playhead { left: calc(44px + (100% - 44px) * var(--p)); }
-  .note span { display: none; }
+  .roll { --key: 70px; --mw: 18px; }
   .transport > span:last-child { display: none; }
   .menu a { padding: 3px 6px; font-size: 11px; }
   html { scroll-padding-top: 104px; }

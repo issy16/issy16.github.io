@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
   <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet">
-  <link href="css/pixel.css?v=7" rel="stylesheet">
+  <link href="css/pixel.css?v=10" rel="stylesheet">
 </head>
 <body>
 
@@ -143,26 +143,32 @@
 
       <div class="panel roll">
         <div class="panel-label"><span>Timeline</span></div>
-        <!-- months from Jan 2023; 48 months = 100% -->
-        <div class="roll-grid">
-          <div></div>
-          <div class="roll-years"><span>2023</span><span>2024</span><span>2025</span><span>2026</span></div>
-
-          <div class="roll-row"><div class="roll-key">Dev</div><div class="roll-lane"><div class="note flip" style="--s:72.9%; --w:22.9%"><span>Ringus · Software Developer</span></div></div></div>
-          <div class="roll-row"><div class="roll-key">Grader</div><div class="roll-lane"><div class="note" style="--s:31.25%; --w:31.25%"><span>UCR Course Grader</span></div></div></div>
-          <div class="roll-row"><div class="roll-key">Research</div><div class="roll-lane"><div class="note" style="--s:41.7%; --w:8.3%"><span>ML Research Intern</span></div></div></div>
-          <div class="roll-row"><div class="roll-key">Intern</div><div class="roll-lane"><div class="note" style="--s:10.4%; --w:6.25%"><span>Monet Analytics</span></div></div></div>
-          <div class="roll-row"><div class="roll-key">Projects</div><div class="roll-lane">
-            <div class="note soft" style="--s:25%; --w:6.25%"></div>
-            <div class="note soft" style="--s:41.7%; --w:8.3%"></div>
-            <div class="note soft" style="--s:60.4%; --w:4.2%"><span>Projects</span></div>
-          </div></div>
-          <div class="roll-row"><div class="roll-key">Awards</div><div class="roll-lane">
-            <div class="note soft" style="--s:25%; --w:2.1%"><span>Rose Hack</span></div>
-            <div class="note" style="--s:60.4%; --w:2.1%"><span>Summa Cum Laude</span></div>
-          </div></div>
-
-          <div class="playhead" style="--p:0.958" aria-hidden="true"></div>
+        <!-- Built by script from these dates (YYYY-MM, end month inclusive; "now" = ongoing).
+             The grid runs from Jan 2023 to a few months past today and moves the NOW line every month. -->
+        <div class="roll-scroll" tabindex="0" aria-label="Experience timeline, scroll sideways">
+          <div class="roll-grid" id="roll">
+            <div class="roll-row" data-key="Dev">
+              <i data-start="2025-12" data-end="2026-10" data-label="Ringus · Software Developer"></i>
+            </div>
+            <div class="roll-row" data-key="Grader">
+              <i data-start="2024-04" data-end="2025-06" data-label="UCR Course Grader"></i>
+            </div>
+            <div class="roll-row" data-key="Research">
+              <i data-start="2024-09" data-end="2024-12" data-label="ML Research Intern"></i>
+            </div>
+            <div class="roll-row" data-key="Intern">
+              <i data-start="2023-06" data-end="2023-08" data-label="Monet Analytics"></i>
+            </div>
+            <div class="roll-row" data-key="Projects">
+              <i class="soft" data-start="2024-01" data-end="2024-03" data-label="Appendicitis ML"></i>
+              <i class="soft" data-start="2024-09" data-end="2024-12" data-label=""></i>
+              <i class="soft" data-start="2025-06" data-end="2025-07" data-label="WhatsApp Summarizer"></i>
+            </div>
+            <div class="roll-row" data-key="Awards">
+              <i class="soft" data-start="2024-01" data-end="2024-01" data-label="Rose Hack"></i>
+              <i data-start="2025-06" data-end="2025-06" data-label="Summa Cum Laude"></i>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -319,6 +325,52 @@
 
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Experience timeline: Jan 2023 -> a few months past today, NOW line on today's date
+    (function () {
+      var roll = document.getElementById('roll');
+      var START_Y = 2023, PAD = 3;
+      var now = new Date();
+      var nowIdx = (now.getFullYear() - START_Y) * 12 + now.getMonth();
+      var dayFrac = (now.getDate() - 1) / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      var total = nowIdx + 1 + PAD;
+      function idx(v) { if (v === 'now') return nowIdx; var p = v.split('-'); return (+p[0] - START_Y) * 12 + (+p[1] - 1); }
+      roll.style.setProperty('--months', total);
+
+      // year header
+      var head = document.createElement('div'); head.className = 'roll-head';
+      head.innerHTML = '<div class="roll-corner"></div>';
+      var years = document.createElement('div'); years.className = 'roll-years';
+      for (var m = 0; m < total; m += 12) {
+        var span = document.createElement('span');
+        span.textContent = START_Y + m / 12; span.style.setProperty('--n', Math.min(12, total - m));
+        years.appendChild(span);
+      }
+      head.appendChild(years); roll.insertBefore(head, roll.firstChild);
+
+      // rows + notes
+      roll.querySelectorAll('.roll-row').forEach(function (row) {
+        var key = document.createElement('div'); key.className = 'roll-key'; key.textContent = row.dataset.key;
+        var lane = document.createElement('div'); lane.className = 'roll-lane';
+        row.querySelectorAll('i').forEach(function (n) {
+          var a = idx(n.dataset.start), b = idx(n.dataset.end);
+          var note = document.createElement('div');
+          note.className = 'note' + (n.classList.contains('soft') ? ' soft' : '') + (b > total - 9 ? ' flip' : '');
+          note.style.setProperty('--s', a); note.style.setProperty('--w', b - a + 1);
+          note.title = n.dataset.label || '';
+          if (n.dataset.label) { var t = document.createElement('span'); t.textContent = n.dataset.label; note.appendChild(t); }
+          lane.appendChild(note);
+        });
+        row.innerHTML = ''; row.appendChild(key); row.appendChild(lane);
+      });
+
+      // NOW playhead
+      var ph = document.createElement('div'); ph.className = 'playhead'; ph.setAttribute('aria-hidden', 'true');
+      ph.style.setProperty('--p', nowIdx + dayFrac); roll.appendChild(ph);
+
+      // start scrolled to the end so NOW is in view
+      var sc = roll.parentNode; sc.scrollLeft = sc.scrollWidth;
+    })();
 
     // Email: copy the address too, since mailto does nothing without a mail app
     (function () {
