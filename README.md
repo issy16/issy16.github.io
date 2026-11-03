@@ -1,10 +1,12 @@
+# issy16.github.io
 
-# Welcome to LearnCS8 Resume Website
+Personal resume site for Isabel Chen, live at https://issy16.github.io.
 
-This is an template resume website built using Bootstrap. 
+A single static page with no build step:
 
-Follow the instructions on Lab 3 located at https://www.learncs8.com 
+- `index.html`: page content
+- `css/pixel.css`: styles (pink pixel "music software" theme)
+- `img/`: portrait, favicon, and portfolio images
+- `vendor/fontawesome-free/`: icon font for the social buttons
 
-Special thanks to the open source bootstrap libraries that made this website possible.
-
-If you have any problems, please reach out to support on the LearnCS8.com homepage.
+Edit `index.html` and push to `main`; GitHub Pages republishes automatically.
