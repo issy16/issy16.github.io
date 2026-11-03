@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
   <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet">
-  <link href="css/pixel.css?v=14" rel="stylesheet">
+  <link href="css/pixel.css?v=15" rel="stylesheet">
 </head>
 <body>
 
@@ -358,11 +358,11 @@
     // Experience timeline: Jan 2023 -> a few months past today, NOW line on today's date
     (function () {
       var roll = document.getElementById('roll');
-      var START_Y = 2023, PAD = 3;
+      var START_Y = 2023;
       var now = new Date();
       var nowIdx = (now.getFullYear() - START_Y) * 12 + now.getMonth();
       var dayFrac = (now.getDate() - 1) / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-      var total = nowIdx + 1 + PAD;
+      var total = Math.min(nowIdx + 2, (now.getFullYear() - START_Y + 1) * 12);   // stop at the end of this year
       function idx(v) { if (v === 'now') return nowIdx; var p = v.split('-'); return (+p[0] - START_Y) * 12 + (+p[1] - 1); }
       roll.style.setProperty('--months', total);
 
@@ -395,7 +395,9 @@
 
       // NOW playhead
       var ph = document.createElement('div'); ph.className = 'playhead'; ph.setAttribute('aria-hidden', 'true');
-      ph.style.setProperty('--p', nowIdx + dayFrac); roll.appendChild(ph);
+      ph.style.setProperty('--p', nowIdx + dayFrac);
+      if (total - (nowIdx + dayFrac) < 2) ph.classList.add('edge');   // keep the NOW label inside the grid
+      roll.appendChild(ph);
 
       // start scrolled to the end so NOW is in view
       var sc = roll.parentNode; sc.scrollLeft = sc.scrollWidth;
