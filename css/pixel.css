@@ -198,6 +198,15 @@ a.key:active { transform: translateY(2px); box-shadow: none; }
 .gallery figure { margin: 0; }
 .gallery img { display: block; width: 100%; height: 220px; object-fit: contain; background: #fff; border: 1px solid var(--grid); }
 
+/* ---------- toast ---------- */
+.toast {
+  position: fixed; left: 50%; bottom: 64px; z-index: 20; transform: translate(-50%, 12px);
+  background: var(--ink); color: #fff; font-family: var(--mono); font-size: 14px;
+  padding: 10px 16px; border: 1.5px solid var(--pink); box-shadow: 4px 4px 0 var(--pink);
+  opacity: 0; pointer-events: none; transition: opacity .2s steps(3), transform .2s steps(3); white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
 /* ---------- transport bar ---------- */
 .transport {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
