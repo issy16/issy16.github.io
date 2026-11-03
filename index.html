@@ -9,7 +9,7 @@
   <link rel="shortcut icon" href="img/website.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
   <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet">
   <link href="css/pixel.css" rel="stylesheet">
 </head>
@@ -41,9 +41,16 @@
         <span class="player">♥ READY</span>
       </div>
 
-      <div class="panel p-matrix" aria-hidden="true">
-        <div class="panel-label"><span>Sequencer</span></div>
-        <div class="matrix" id="matrix"></div>
+      <div class="panel p-matrix now">
+        <div class="panel-label"><span>Now Playing</span><span class="hot">● Live</span></div>
+        <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <p class="now-status"><span class="led" aria-hidden="true"></span>Open to work</p>
+        <p class="now-sub">Seeking full-time roles in</p>
+        <ul class="now-list">
+          <li>Software Engineering</li>
+          <li>Machine Learning</li>
+          <li>Data Science</li>
+        </ul>
       </div>
 
       <div class="panel p-about">
@@ -283,17 +290,6 @@
 
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
-
-    // Dot-matrix sequencer (decorative, deterministic pattern)
-    (function () {
-      var m = document.getElementById('matrix'), seed = 7, html = '';
-      function rnd() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
-      for (var i = 0; i < 64; i++) {
-        var r = rnd(), col = i % 8, w = (col === 3 || col === 4) ? 0.25 : 0;
-        html += '<i class="' + (r < 0.18 + w ? 'a' : r < 0.32 + w ? 'b' : r < 0.42 + w ? 'c' : '') + '"></i>';
-      }
-      m.innerHTML = html;
-    })();
 
     // Oscilloscope wave (decorative)
     (function () {
