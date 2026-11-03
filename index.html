@@ -323,24 +323,18 @@
     <span>♥ isabel_chen.wav</span>
   </div>
 
+  <script src="js/eq-data.js?v=1"></script>
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
 
-    // Now Playing equalizer: a loose, lo-fi-feeling fake spectrum.
-    // Humanized drums (swing, uneven velocity, the odd skipped hit), a wandering melody,
-    // neighbouring bars that pull on each other, and bars that fall with a bit of gravity.
+    // Now Playing equalizer: plays back levels measured from Isabel's track (js/eq-data.js), looping.
     (function () {
-      var bars = [].slice.call(document.querySelectorAll('.eq i'));
-      if (!bars.length || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      var n = bars.length;
-      function rnd(k) { var x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
-      function noise(x, k) {                                  // smooth 1-D value noise
-        var i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
-        return rnd(i + k * 97) * (1 - u) + rnd(i + 1 + k * 97) * u;
-      }
-      function hit(t, at, vel, decay) { var d = t - at; return d < 0 ? 0 : vel * Math.exp(-d * decay); }
-      var cur = bars.map(function () { return 0.25; }), fall = bars.map(function () { return 0; });
-      var visible = true, last = performance.now(), clock = 0, beatPos = 0;
+      var bars = [].slice.call(document.querySelectorAll('.eq i')), D = window.EQ_DATA;
+      if (!bars.length || !D || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var A = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_', L = D.levels, nb = D.bands;
+      function lvl(f, b) { return A.indexOf(L.charAt((f % D.frames) * nb + b)) / 63; }
+      var cur = bars.map(function () { return 0.2; }), fall = bars.map(function () { return 0; });
+      var visible = true, last = performance.now(), pos = 0;
       if ('IntersectionObserver' in window) {
         new IntersectionObserver(function (e) { visible = e[0].isIntersecting; }).observe(bars[0].parentNode);
       }
@@ -348,30 +342,13 @@
         requestAnimationFrame(frame);
         var dt = Math.min(0.05, (ts - last) / 1000); last = ts;
         if (!visible) return;
-        clock += dt;
-        var bpm = 88 + 4 * Math.sin(clock * 0.07);            // tempo drifts a little
-        beatPos += dt * bpm / 60;
-        var k = Math.floor(beatPos), ph = (beatPos - k) * 60 / bpm;   // seconds since this beat
-        var len = 60 / bpm;
-        // drums, each hit nudged and with its own strength
-        var kick  = (rnd(k) > 0.12 ? hit(ph, rnd(k + 5) * 0.02, 0.7 + 0.3 * rnd(k + 1), 6) : 0)
-                  + (k % 4 === 2 && rnd(k + 9) > 0.5 ? hit(ph, len * 0.75, 0.5, 7) : 0);
-        var snare = (k % 2 === 1) ? hit(ph, 0.015 + rnd(k + 2) * 0.03, 0.55 + 0.35 * rnd(k + 3), 8) : 0;
-        var hat   = hit(ph, 0, 0.3 + 0.3 * rnd(k + 4), 14)
-                  + (rnd(k + 6) > 0.25 ? hit(ph, len * 0.6, 0.2 + 0.35 * rnd(k + 7), 14) : 0);   // swung off-beat
-        var swell = 0.75 + 0.25 * noise(clock * 0.15, 99);
-        var tgt = [];
-        for (var i = 0; i < n; i++) {
-          var x = i / (n - 1);
-          var low = Math.max(0, 1 - x * 2), mid = Math.max(0, 1 - Math.abs(x - 0.5) * 2.6), high = Math.max(0, x * 1.4 - 0.35);
-          var melody = noise(clock * (0.9 + x * 1.6), i) * 0.55 + noise(clock * 3.1, i + 40) * 0.12;
-          tgt.push((0.06 + kick * 0.9 * low + snare * 0.65 * mid + hat * 0.85 * high + melody * (0.38 + 0.2 * mid)) * swell);
-        }
-        for (var i = 0; i < n; i++) {                         // neighbours pull on each other
-          var a = tgt[Math.max(0, i - 1)], c = tgt[Math.min(n - 1, i + 1)];
-          var t2 = Math.min(1, tgt[i] * 0.6 + (a + c) * 0.2);
-          if (t2 > cur[i]) { cur[i] += (t2 - cur[i]) * Math.min(1, dt * 22); fall[i] = 0; }
-          else { fall[i] += dt * 2.2; cur[i] = Math.max(t2, cur[i] - fall[i] * dt); }
+        pos += dt * D.fps;
+        var f = Math.floor(pos), u = pos - f;
+        for (var i = 0; i < bars.length; i++) {
+          var b = Math.min(nb - 1, i);
+          var t = lvl(f, b) * (1 - u) + lvl(f + 1, b) * u;      // interpolate between measured frames
+          if (t > cur[i]) { cur[i] += (t - cur[i]) * Math.min(1, dt * 25); fall[i] = 0; }
+          else { fall[i] += dt * 2.5; cur[i] = Math.max(t, cur[i] - fall[i] * dt); }
           bars[i].style.height = (6 + cur[i] * 94).toFixed(1) + '%';
         }
       }

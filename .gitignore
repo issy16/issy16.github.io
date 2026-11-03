@@ -1,0 +1,7 @@
+# Keep audio source files out of the repo (only measured levels in js/eq-data.js are published)
+*.wav
+*.mp3
+*.m4a
+*.aiff
+*.flac
+.DS_Store
