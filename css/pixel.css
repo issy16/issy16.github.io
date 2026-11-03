@@ -100,7 +100,7 @@ section { margin-bottom: 44px; }
 .hero .p-scope { grid-area: scope; }
 .hero .p-stats { grid-area: stats; }
 
-.avatar { display: block; width: 160px; height: 184px; object-fit: cover; margin: 4px auto 10px; border: 1.5px solid var(--line); background: #fff; }
+.avatar { display: block; width: 100%; max-width: 280px; height: auto; aspect-ratio: 3 / 4; object-fit: cover; margin: 4px auto 10px; border: 1.5px solid var(--line); background: #fff; }
 .player { font-family: var(--label); font-size: 12px; color: var(--pink-ink); }
 
 .p-about h1 {
