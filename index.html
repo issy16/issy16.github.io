@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
   <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet">
-  <link href="css/pixel.css?v=3" rel="stylesheet">
+  <link href="css/pixel.css?v=4" rel="stylesheet">
 </head>
 <body>
 
@@ -59,7 +59,7 @@
         <div class="panel-label"><span>Track 01 · About</span><span class="hot">● REC</span></div>
         <h1>Isabel Chen<span class="cursor" aria-hidden="true"></span></h1>
         <p class="role">Software Developer · UC Riverside CS ’25</p>
-        <p>Hi! I'm Isabel, a software developer and Summa Cum Laude Computer Science graduate of the University of California, Riverside. I love applying data-driven solutions to real-world challenges, and I'm looking for full-time roles as a Software Engineer, Full Stack Developer, or AI/ML Engineer.</p>
+        <p>Hi! I'm Isabel, a software developer who loves building full-stack applications and AI-powered tools that solve real problems. I graduated Summa Cum Laude in Computer Science from UC Riverside with a 3.98 GPA, and I'm looking for full-time roles as a Software Engineer, Full Stack Developer, or AI/ML Engineer.</p>
         <p>Most recently I was a Software Developer at Ringus Solution Enterprise Limited, building modules for a large-scale government budgeting and financial management system. Before that I did NLP research at UC Riverside, analyzing 40,000+ Reddit posts with Google Gemini and BERTopic, and interned as a data scientist at Monet Analytics.</p>
         <p>Beyond work, I’ve hosted travelers from around the world as a top-rated Airbnb host in Taipei. I have three hamsters as my family 🐹🐹🐹 and I love swimming! 🏊‍♀️</p>
         <div class="keys-row">
@@ -69,9 +69,35 @@
         </div>
       </div>
 
-      <div class="panel p-scope scope" aria-hidden="true">
-        <div class="panel-label"><span>Scope</span><span class="hot">CH1</span></div>
-        <svg viewBox="0 0 200 90" preserveAspectRatio="none" id="scope"></svg>
+      <div class="panel p-scope">
+        <div class="panel-label"><span>Impact</span><span class="hot">CH1</span></div>
+        <ul class="impact">
+          <li>
+            <div class="impact-top"><span>Manual analysis cut</span><b>90%</b></div>
+            <div class="meter thin"><span style="--w:90%"></span></div>
+            <small>NLP research</small>
+          </li>
+          <li>
+            <div class="impact-top"><span>Model accuracy</span><b>97%</b></div>
+            <div class="meter thin"><span style="--w:97%"></span></div>
+            <small>Appendicitis ML</small>
+          </li>
+          <li>
+            <div class="impact-top"><span>Real-time accuracy</span><b>95%</b></div>
+            <div class="meter thin"><span style="--w:95%"></span></div>
+            <small>Rose Hack robot</small>
+          </li>
+          <li>
+            <div class="impact-top"><span>Repositioning steps cut</span><b>45%</b></div>
+            <div class="meter thin"><span style="--w:45%"></span></div>
+            <small>Port A* optimizer</small>
+          </li>
+          <li>
+            <div class="impact-top"><span>Prediction error cut</span><b>20%</b></div>
+            <div class="meter thin"><span style="--w:20%"></span></div>
+            <small>Monet Analytics</small>
+          </li>
+        </ul>
       </div>
 
       <div class="panel p-stats">
@@ -86,7 +112,7 @@
             <div class="meter" role="img" aria-label="Core GPA 4.00 out of 4.00"><span style="--w:100%"></span></div>
           </div>
           <div class="score">Reddit posts mined<b>00<em>40,000</em>+</b></div>
-          <div class="score">Model accuracy<b>0000<em>97</em>%</b></div>
+          <div class="score">Assignments graded<b>0000<em>200</em>+</b></div>
         </div>
       </div>
     </section>
@@ -292,20 +318,6 @@
 
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
-
-    // Oscilloscope wave (decorative)
-    (function () {
-      var s = document.getElementById('scope'), a = '', b = '';
-      for (var x = 0; x <= 200; x += 2) {
-        var env = 0.45 + 0.55 * Math.abs(Math.sin(x / 38));
-        var y1 = 45 + Math.sin(x / 3.2) * 32 * env;
-        var y2 = 45 + Math.sin(x / 5 + 1) * 26 * (1 - env * 0.5);
-        a += (x ? 'L' : 'M') + x + ' ' + y1.toFixed(1);
-        b += (x ? 'L' : 'M') + x + ' ' + y2.toFixed(1);
-      }
-      s.innerHTML = '<path d="' + b + '" fill="none" stroke="#a9adb6" stroke-width="1"/>' +
-                    '<path d="' + a + '" fill="none" stroke="#e8467c" stroke-width="1.6"/>';
-    })();
 
     // Scroll "playback" bar + active menu item
     (function () {
