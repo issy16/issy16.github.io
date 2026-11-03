@@ -198,7 +198,8 @@ a.key:active { transform: translateY(2px); box-shadow: none; }
 
 /* skills */
 .keyboard { display: grid; gap: 16px; margin-top: 18px; }
-.stats-skills { margin-top: 22px; padding-top: 16px; border-top: 1px dashed var(--grid); }
+.stats-skills { margin-top: 0; }
+.stats-skills + .stats-grid { margin-top: 22px; padding-top: 18px; border-top: 1px dashed var(--grid); }
 .keyboard h4 { font-family: var(--label); font-weight: 400; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 8px; color: var(--muted); }
 
 /* gallery */
