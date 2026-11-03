@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
   <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet">
-  <link href="css/pixel.css?v=20" rel="stylesheet">
+  <link href="css/pixel.css?v=22" rel="stylesheet">
 </head>
 <body>
 
@@ -283,7 +283,17 @@
 
   </main>
 
-  <footer>© <span id="year">2026</span> Isabel Chen</footer>
+  <footer>© <span id="year">2026</span> Isabel Chen <button class="secret-start" id="mv-open" type="button" aria-haspopup="dialog" title="psst…">▶ press start</button></footer>
+
+  <div class="mv-modal" id="mv" hidden>
+    <div class="mv-box panel" role="dialog" aria-modal="true" aria-labelledby="mv-title">
+      <div class="panel-label"><span id="mv-title">isabel_chen.wav · music video</span></div>
+      <button class="mv-close key" id="mv-close" type="button" aria-label="Close video">✕</button>
+      <video id="mv-video" controls playsinline preload="none" poster="img/mv-poster.jpg">
+        <source src="video/isabel_chen_mv.mp4" type="video/mp4">
+      </video>
+    </div>
+  </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -297,6 +307,23 @@
   <script src="js/eq-data.js?v=1"></script>
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Music video: click the photo to open a pixel-style player
+    (function () {
+      var modal = document.getElementById('mv'), video = document.getElementById('mv-video');
+      var openBtn = document.getElementById('mv-open'), closeBtn = document.getElementById('mv-close');
+      function open() {
+        modal.hidden = false; document.body.style.overflow = 'hidden'; window.eqPaused = true;
+        closeBtn.focus(); var p = video.play(); if (p && p.catch) p.catch(function () {});
+      }
+      function close() {
+        video.pause(); modal.hidden = true; document.body.style.overflow = ''; window.eqPaused = false; openBtn.focus();
+      }
+      openBtn.addEventListener('click', open);
+      closeBtn.addEventListener('click', close);
+      modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) close(); });
+    })();
 
     // Now Playing equalizer: plays back levels measured from Isabel's track (js/eq-data.js), looping.
     (function () {
@@ -312,7 +339,7 @@
       function frame(ts) {
         requestAnimationFrame(frame);
         var dt = Math.min(0.05, (ts - last) / 1000); last = ts;
-        if (!visible) return;
+        if (!visible || window.eqPaused) return;
         pos += dt * D.fps;
         var f = Math.floor(pos), u = pos - f;
         for (var i = 0; i < bars.length; i++) {

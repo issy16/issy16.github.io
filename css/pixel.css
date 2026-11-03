@@ -103,6 +103,22 @@ section { margin-bottom: 44px; }
 .avatar { display: block; width: 100%; max-width: 280px; height: auto; aspect-ratio: 3 / 4; object-fit: cover; margin: 4px auto 10px; border: 1.5px solid var(--line); background: #fff; }
 .player { font-family: var(--label); font-size: 12px; color: var(--pink-ink); }
 
+/* hidden easter egg in the footer */
+.secret-start {
+  margin-left: 10px; padding: 0 2px; border: 0; background: none; cursor: pointer;
+  font-family: var(--label); font-size: 10px; color: var(--grid); letter-spacing: .06em;
+  animation: blink-soft 2.6s steps(2) infinite; transition: color .15s steps(2);
+}
+.secret-start:hover, .secret-start:focus-visible { color: var(--pink); animation: none; }
+@keyframes blink-soft { 50% { opacity: .35; } }
+
+/* music video pop-up */
+.mv-modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(29, 27, 42, .78); }
+.mv-modal[hidden] { display: none; }
+.mv-box { width: 100%; max-width: 960px; padding: 40px 12px 12px; box-shadow: 6px 6px 0 var(--pink); }
+.mv-box video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; image-rendering: pixelated; }
+.mv-close { position: absolute; top: 6px; right: 8px; padding: 2px 9px; font-size: 14px; cursor: pointer; }
+
 .p-about h1 {
   font-family: var(--label); font-weight: 700; font-size: clamp(30px, 6vw, 52px); line-height: 1.05; letter-spacing: .02em;
   margin: 6px 0 6px;
@@ -241,7 +257,7 @@ footer { text-align: center; font-family: var(--label); font-size: 12px; color: 
 @keyframes blink { 50% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .cursor { animation: none; }
+  .cursor, .secret-start { animation: none; }
 }
 
 @media (max-width: 820px) {
