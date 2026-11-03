@@ -362,7 +362,7 @@
       var now = new Date();
       var nowIdx = (now.getFullYear() - START_Y) * 12 + now.getMonth();
       var dayFrac = (now.getDate() - 1) / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-      var total = Math.min(nowIdx + 2, (now.getFullYear() - START_Y + 1) * 12);   // stop at the end of this year
+      var total = nowIdx + 1;                                 // grid ends with the current month
       function idx(v) { if (v === 'now') return nowIdx; var p = v.split('-'); return (+p[0] - START_Y) * 12 + (+p[1] - 1); }
       roll.style.setProperty('--months', total);
 
@@ -396,7 +396,7 @@
       // NOW playhead
       var ph = document.createElement('div'); ph.className = 'playhead'; ph.setAttribute('aria-hidden', 'true');
       ph.style.setProperty('--p', nowIdx + dayFrac);
-      if (total - (nowIdx + dayFrac) < 2) ph.classList.add('edge');   // keep the NOW label inside the grid
+      ph.classList.add('edge');   // keep the NOW label inside the grid
       roll.appendChild(ph);
 
       // start scrolled to the end so NOW is in view
