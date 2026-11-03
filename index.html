@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
   <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet">
-  <link href="css/pixel.css?v=23" rel="stylesheet">
+  <link href="css/pixel.css?v=25" rel="stylesheet">
 </head>
 <body>
 
@@ -303,6 +303,30 @@
   <script src="js/eq-data.js?v=1"></script>
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+
+    // Experience & Projects: collapse each card to its title; click to expand the details
+    document.querySelectorAll('#experience .card, #projects .card').forEach(function (card, i) {
+      var h3 = card.querySelector('h3'), org = card.querySelector('.org');
+      var body = document.createElement('div'); body.className = 'card-body'; body.id = 'card-body-' + i;
+      var node = org ? org.nextElementSibling : h3.nextElementSibling;
+      while (node) { var next = node.nextElementSibling; body.appendChild(node); node = next; }
+      card.appendChild(body);
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'card-toggle';
+      btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', body.id);
+      btn.innerHTML = '<span>' + h3.innerHTML + '</span><span class="chev" aria-hidden="true">+</span>';
+      h3.innerHTML = ''; h3.appendChild(btn);
+      body.hidden = true; card.classList.add('collapsible');
+      function toggle() {
+        var open = btn.getAttribute('aria-expanded') !== 'true';
+        btn.setAttribute('aria-expanded', open); body.hidden = !open; card.classList.toggle('open', open);
+        btn.querySelector('.chev').textContent = open ? '−' : '+';
+      }
+      card.addEventListener('click', function (e) {
+        if (e.target.closest('a') || e.target.closest('.card-body')) return;   // links and open details don't toggle
+        toggle();
+      });
+    });
 
     // Music video: click the photo to open a pixel-style player
     (function () {
