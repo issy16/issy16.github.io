@@ -106,10 +106,10 @@ section { margin-bottom: 44px; }
 /* hidden easter egg in the footer */
 .secret-start {
   margin-left: 10px; padding: 0 2px; border: 0; background: none; cursor: pointer;
-  font-family: var(--label); font-size: 10px; color: var(--grid); letter-spacing: .06em;
+  font-family: var(--label); font-size: 10px; color: var(--pink); letter-spacing: .06em;
   animation: blink-soft 2.6s steps(2) infinite; transition: color .15s steps(2);
 }
-.secret-start:hover, .secret-start:focus-visible { color: var(--pink); animation: none; }
+.secret-start:hover, .secret-start:focus-visible { color: var(--pink-ink); animation: none; }
 @keyframes blink-soft { 50% { opacity: .35; } }
 
 /* music video pop-up */
@@ -204,10 +204,12 @@ a.key:active { transform: translateY(2px); box-shadow: none; }
 
 /* ---------- cards ---------- */
 .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 14px; align-items: start; }
-.card.collapsible { cursor: pointer; transition: box-shadow .15s steps(2), border-color .15s steps(2); }
-.card.collapsible:hover { border-color: var(--pink); box-shadow: 3px 3px 0 var(--pink-2); }
+.card.collapsible { -webkit-tap-highlight-color: transparent; cursor: pointer; transition: box-shadow .15s steps(2), border-color .15s steps(2); }
+@media (hover: hover) { .card.collapsible:hover { border-color: var(--pink); box-shadow: 3px 3px 0 var(--pink-2); } .card.collapsible:hover .chev { background: var(--pink); border-color: var(--pink-ink); color: #fff; box-shadow: 0 2px 0 var(--pink-ink); } }
+.card-toggle:focus:not(:focus-visible) { outline: none; }
 .card.collapsible .org { margin-bottom: 0; }
 .card-toggle {
+  -webkit-tap-highlight-color: transparent;
   display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; width: 100%;
   padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
@@ -217,7 +219,7 @@ a.key:active { transform: translateY(2px); box-shadow: none; }
   background: #fff; border: 1.5px solid var(--line); border-radius: 4px; box-shadow: 0 2px 0 var(--line);
 }
 .card.open .chev { transform: rotate(90deg); }
-.card.open .chev, .card.collapsible:hover .chev { background: var(--pink); border-color: var(--pink-ink); color: #fff; box-shadow: 0 2px 0 var(--pink-ink); }
+.card.open .chev { background: var(--pink); border-color: var(--pink-ink); color: #fff; box-shadow: 0 2px 0 var(--pink-ink); }
 .card-body { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--grid); animation: unfold .2s steps(3); }
 @keyframes unfold { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .cards.one { grid-template-columns: 1fr; }
