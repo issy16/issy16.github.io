@@ -455,21 +455,21 @@
       addEventListener('scroll', update, { passive: true }); update();
 
       var links = document.querySelectorAll('.menu a');
-      if ('IntersectionObserver' in window) {
-        var inView = {};                                   // which tracked areas sit in the middle band of the screen
-        var io = new IntersectionObserver(function (entries) {
-          entries.forEach(function (e) { inView[e.target.id] = e.isIntersecting; });
-          // the Skills box lives inside About, so it wins when both are in view
-          var current = inView.skills ? 'skills' : Object.keys(inView).filter(function (k) { return inView[k]; })[0];
-          if (!current) return;
-          links.forEach(function (a) { a.classList.toggle('active', a.getAttribute('href') === '#' + current); });
-        }, { rootMargin: '-40% 0px -55% 0px' });
-        document.querySelectorAll('main section, #skills').forEach(function (s) { io.observe(s); });
-        addEventListener('scroll', function () {           // at the very bottom, the last section (Gallery) is current
-          if (innerHeight + scrollY >= document.documentElement.scrollHeight - 4)
-            links.forEach(function (a) { a.classList.toggle('active', a.getAttribute('href') === '#portfolio'); });
-        }, { passive: true });
+      // highlight the last area (in page order) whose top has passed ~40% down the screen;
+      // the Skills box counts as its own area even though it sits inside About
+      var areas = ['about', 'skills', 'experience', 'projects', 'awards', 'portfolio']
+        .map(function (id) { return document.getElementById(id); }).filter(Boolean);
+      var ticking = false;
+      function setActive() {
+        ticking = false;
+        var line = innerHeight * 0.4, current = areas[0].id;
+        areas.forEach(function (el) { if (el.getBoundingClientRect().top <= line) current = el.id; });
+        if (innerHeight + scrollY >= document.documentElement.scrollHeight - 4) current = 'portfolio';
+        links.forEach(function (a) { a.classList.toggle('active', a.getAttribute('href') === '#' + current); });
       }
+      addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(setActive); } }, { passive: true });
+      addEventListener('resize', setActive);
+      setActive();
     })();
   </script>
 </body>
