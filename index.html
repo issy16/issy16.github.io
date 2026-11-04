@@ -456,13 +456,19 @@
 
       var links = document.querySelectorAll('.menu a');
       if ('IntersectionObserver' in window) {
+        var inView = {};                                   // which tracked areas sit in the middle band of the screen
         var io = new IntersectionObserver(function (entries) {
-          entries.forEach(function (e) {
-            if (!e.isIntersecting) return;
-            links.forEach(function (a) { a.classList.toggle('active', a.getAttribute('href') === '#' + e.target.id); });
-          });
+          entries.forEach(function (e) { inView[e.target.id] = e.isIntersecting; });
+          // the Skills box lives inside About, so it wins when both are in view
+          var current = inView.skills ? 'skills' : Object.keys(inView).filter(function (k) { return inView[k]; })[0];
+          if (!current) return;
+          links.forEach(function (a) { a.classList.toggle('active', a.getAttribute('href') === '#' + current); });
         }, { rootMargin: '-40% 0px -55% 0px' });
-        document.querySelectorAll('main section').forEach(function (s) { io.observe(s); });
+        document.querySelectorAll('main section, #skills').forEach(function (s) { io.observe(s); });
+        addEventListener('scroll', function () {           // at the very bottom, the last section (Gallery) is current
+          if (innerHeight + scrollY >= document.documentElement.scrollHeight - 4)
+            links.forEach(function (a) { a.classList.toggle('active', a.getAttribute('href') === '#portfolio'); });
+        }, { passive: true });
       }
     })();
   </script>
