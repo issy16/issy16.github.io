@@ -125,6 +125,16 @@ textarea{min-height:64px;resize:vertical;line-height:1.45}
 .modal .card{background:#fff;border-radius:8px;padding:20px;max-width:440px;width:100%;max-height:90vh;overflow:auto}
 .modal h2{margin:0 0 12px;font-size:17px}
 .demo{background:#fff6e0;border:1px solid #f0d58a;color:#6b4d00;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}.demo a{color:var(--main);font-weight:700;text-decoration:none}
+.nb{border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:14px}
+.nb h3{margin:0 0 2px;font-size:17px}
+.nb .meta{font-size:12px;color:var(--mute);margin-bottom:10px}
+.nb .st{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-bottom:10px}
+.nb .st b{font-size:16px}
+.nb table{width:100%;border-collapse:collapse;font-size:13px}
+.nb td,.nb th{padding:5px 6px;border-bottom:1px solid #e3e8ee;text-align:left;vertical-align:top}
+.nb th{font-size:12px;color:var(--mute);font-weight:600}
+.nb .stars{color:#e0a100;letter-spacing:1px;white-space:nowrap}
+.nb .stars i{color:#d5dae1;font-style:normal}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:6px;font-size:13px;z-index:20}
 
 @media (max-width:640px){
@@ -202,7 +212,8 @@ const ITER = 310000;
 const IDLE_LOCK_MS = 30 * 60 * 1000;
 const LS_TOKEN = 'tutorme.token.v1';
 const LS_LOCAL = 'tutorme.local.v1';
-const DEMO = /\/guest(\/|$)/.test(location.pathname); // /tutorme/guest/: sample data, nothing is saved, no token
+const DEMO = /\/guest(\/|$)/.test(location.pathname);
+let DEMO_NOTEBOOK = null; // /tutorme/guest/: sample data, nothing is saved, no token
 
 /* ---------------- state ---------------- */
 const S = {
@@ -253,12 +264,13 @@ async function open(key, blob) {
 }
 
 /* ---------------- GitHub ---------------- */
-const API = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${DATA_PATH}`;
+const apiUrl = (p = DATA_PATH) => `https://api.github.com/repos/${OWNER}/${REPO}/contents/${p}`;
+const PUB_PATH = 'data/teacher.pub.json';
 function ghHeaders() {
   return { 'Accept': 'application/vnd.github+json', 'Authorization': `Bearer ${S.token}`, 'X-GitHub-Api-Version': '2022-11-28' };
 }
-async function ghGet() {
-  const r = await fetch(`${API}?ref=${BRANCH}&t=${Date.now()}`, { headers: ghHeaders(), cache: 'no-store' });
+async function ghGet(path) {
+  const r = await fetch(`${apiUrl(path)}?ref=${BRANCH}&t=${Date.now()}`, { headers: ghHeaders(), cache: 'no-store' });
   if (r.status === 404) {
     // 404 also means "no access" on a private repo; tell them apart by checking the repo itself
     const rr = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}`, { headers: ghHeaders(), cache: 'no-store' });
@@ -276,10 +288,10 @@ async function ghGet() {
   }
   return { sha: j.sha, blob: JSON.parse(text) };
 }
-async function ghPut(blob, sha) {
-  const body = { message: `log update ${new Date().toISOString()}`, content: btoa(JSON.stringify(blob)), branch: BRANCH };
+async function ghPut(blob, sha, path) {
+  const body = { message: `${path ? 'teacher key' : 'log update'} ${new Date().toISOString()}`, content: btoa(JSON.stringify(blob)), branch: BRANCH };
   if (sha) body.sha = sha;
-  const r = await fetch(API, { method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const r = await fetch(apiUrl(path), { method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (r.status === 409 || r.status === 422) return { conflict: true };
   if (r.status === 401 || r.status === 403 || r.status === 404) throw new Error('TOKEN');
   if (!r.ok) throw new Error('NET ' + r.status);
@@ -301,7 +313,7 @@ function merge(a, b) {
 async function saveLocal() {
   if (DEMO) return;
   if (!S.dataKey) return;
-  const blob = await seal(S.dataKey, S.dataSalt, { entries: S.entries, dirty: S.dirty });
+  const blob = await seal(S.dataKey, S.dataSalt, { entries: S.entries, keys: S.keys, dirty: S.dirty });
   ls.set(LS_LOCAL, JSON.stringify(blob));
 }
 async function loadLocal() {
@@ -339,9 +351,10 @@ async function sync() {
       if (remote) {
         const r = await adoptRemote(remote.blob);
         S.entries = merge(S.entries, r.entries || []);
+        if (!S.keys && r.keys) S.keys = r.keys;
         S.remoteSha = remote.sha;
       } else S.remoteSha = null;
-      const blob = await seal(S.dataKey, S.dataSalt, { entries: S.entries });
+      const blob = await seal(S.dataKey, S.dataSalt, { entries: S.entries, keys: S.keys });
       const res = await ghPut(blob, S.remoteSha);
       if (res.conflict) continue;
       S.remoteSha = res.sha; S.dirty = false;
@@ -383,7 +396,7 @@ async function pullOnly() {
 /* ---------------- unlock ---------------- */
 let lockMode = 'unlock'; // unlock | setup
 function showLock(msg) {
-  S.password = S.token = S.dataKey = S.dataSalt = null; S.entries = []; S.editing = null;
+  S.password = S.token = S.dataKey = S.dataSalt = S.keys = null; S.entries = []; S.editing = null; S.view = 'list';
   $('#app').classList.add('hidden'); $('#lock').classList.remove('hidden');
   $('#modalRoot').innerHTML = '';
   $('#pw').value = ''; $('#pw2').value = ''; $('#tok').value = '';
@@ -445,7 +458,7 @@ $('#lockForm').addEventListener('submit', async ev => {
       let data;
       try { data = await open(S.dataKey, remote.blob); }
       catch { throw new Error('密碼錯誤'); }
-      S.entries = data.entries || []; S.remoteSha = remote.sha;
+      S.entries = data.entries || []; S.keys = data.keys || null; S.remoteSha = remote.sha;
       const local = await loadLocal();
       if (local && local.dirty) { S.entries = merge(S.entries, local.entries); S.dirty = true; }
     } else {
@@ -455,7 +468,7 @@ $('#lockForm').addEventListener('submit', async ev => {
       const blob = JSON.parse(raw);
       S.dataSalt = unb64(blob.salt); S.dataKey = await deriveKey(pw, S.dataSalt);
       let data; try { data = await open(S.dataKey, blob); } catch { throw new Error('密碼錯誤'); }
-      S.entries = data.entries || []; S.dirty = !!data.dirty;
+      S.entries = data.entries || []; S.keys = data.keys || null; S.dirty = !!data.dirty;
     }
 
     // 3. remember token on this device (encrypted with the password)
@@ -467,7 +480,7 @@ $('#lockForm').addEventListener('submit', async ev => {
     $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
     go('list');
     if (remote === undefined) setStatus('err', '離線：顯示這台裝置的暫存');
-    else if (S.dirty) sync(); else { setStatus('ok', '已同步'); saveLocal(); }
+    else { if (S.dirty) await sync(); else { setStatus('ok', '已同步'); saveLocal(); } ensureTeacherKey(); }
   } catch (e) {
     err.textContent = e.message || String(e);
   } finally {
@@ -536,7 +549,8 @@ function newEntry(type) {
 
 /* ---------------- views ---------------- */
 function go(view, entry) {
-  if (view === 'list') { S.editing = null; S.formDirty = false; }
+  S.view = view;
+  if (view === 'list' || view === 'students') { S.editing = null; S.formDirty = false; }
   else S.editing = entry;
   render();
   window.scrollTo(0, 0);
@@ -548,6 +562,7 @@ const studentNames = () => [...new Set(live().map(e => e.student).filter(Boolean
 function render() {
   if (!S.dataKey) return;
   if (S.editing) return renderForm();
+  if (S.view === 'students') return renderStudents();
   $('#viewTitle').textContent = '上課紀錄';
   const f = S.filter;
   const names = studentNames();
@@ -561,7 +576,7 @@ function render() {
       <button class="btn pri" data-new="lesson" type="button">＋ 課後紀錄</button>
       <button class="btn" data-new="interview" type="button">＋ 開場訪談</button>
       <button class="btn" data-new="diagnosis" type="button">＋ 程度診斷</button>
-      <button class="btn ghost" id="wordsBtn" type="button" style="margin-left:auto">單字總表</button>
+      <span style="margin-left:auto;display:flex;gap:4px"><button class="btn ghost" id="stuBtn" type="button">學生單字本</button><button class="btn ghost" id="wordsBtn" type="button">單字總表</button></span>
     </div>
     <div class="filters">
       <select id="fStudent" aria-label="學生"><option value="">所有學生</option>${names.map(n => `<option ${n === f.student ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
@@ -575,6 +590,7 @@ function render() {
     const e = S.entries.find(x => x.id === el.dataset.id); go('form', structuredClone(e));
   });
   $('#wordsBtn').onclick = showWordSummary;
+  $('#stuBtn').onclick = () => go('students');
   $('#fStudent').onchange = e => { f.student = e.target.value; render(); };
   $('#fType').onchange = e => { f.type = e.target.value; render(); };
   $('#fQ').oninput = e => { f.q = e.target.value; const pos = e.target.selectionStart; render(); const q = $('#fQ'); q.focus(); q.setSelectionRange(pos, pos); };
@@ -849,6 +865,78 @@ function renderForm() {
   refresh();
 }
 
+/* ---------------- teacher key + student notebooks ---------------- */
+// Each student notebook's content key is also locked with this public key, so the teacher can read it
+// without the student's password. The private half lives only inside the teacher's encrypted log.
+const RSA = { name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' };
+async function ensureTeacherKey() {
+  if (DEMO || !S.token) return;
+  try {
+    if (!S.keys) {
+      const kp = await crypto.subtle.generateKey(RSA, true, ['encrypt', 'decrypt']);
+      S.keys = { pub: await crypto.subtle.exportKey('jwk', kp.publicKey), priv: await crypto.subtle.exportKey('jwk', kp.privateKey), createdAt: Date.now() };
+      S.dirty = true; await saveLocal(); await sync();
+      if (S.dirty) return; // could not save the key; try again next time
+    }
+    const cur = await ghGet(PUB_PATH).catch(() => null);
+    if (!cur || cur.blob.n !== S.keys.pub.n) {
+      const pub = { kty: S.keys.pub.kty, n: S.keys.pub.n, e: S.keys.pub.e, alg: S.keys.pub.alg };
+      await ghPut(pub, cur?.sha, PUB_PATH);
+    }
+  } catch {}
+}
+async function listNotebooks() {
+  const r = await fetch(`${apiUrl('data')}?ref=${BRANCH}&t=${Date.now()}`, { headers: ghHeaders(), cache: 'no-store' });
+  if (r.status === 404) return [];
+  if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'TOKEN' : 'NET');
+  return (await r.json()).filter(f => /^student(-[a-z0-9-]+)?\.enc\.json$/.test(f.name)).map(f => f.path);
+}
+async function openNotebook(path) {
+  const got = await ghGet(path); if (!got) return null;
+  const blob = got.blob, slug = (path.match(/student-([a-z0-9-]+)\.enc/) || [])[1] || '';
+  if (!blob.tk) return { slug, pending: true };
+  const priv = await crypto.subtle.importKey('jwk', S.keys.priv, RSA, false, ['decrypt']);
+  const raw = await crypto.subtle.decrypt({ name: 'RSA-OAEP' }, priv, unb64(blob.tk));
+  const dek = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+  const data = JSON.parse(dec.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(blob.iv) }, dek, unb64(blob.ct))));
+  return { slug, ...data };
+}
+const starText = n => '★'.repeat(n || 0) + `<i>${'★'.repeat(5 - (n || 0))}</i>`;
+function notebookHtml(nb) {
+  const url = new URL('student/' + (nb.slug ? '?s=' + nb.slug : ''), location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '')).href;
+  if (nb.pending) return `<div class="nb"><h3>${esc(nb.slug || '（預設）')}</h3><div class="meta">${esc(url)}</div><p style="color:var(--mute);font-size:13px;margin:0">這本單字本還沒更新成新版。請學生打開單字本、輸入密碼一次，之後就會出現在這裡。</p></div>`;
+  const words = (nb.words || []).filter(w => !w.deleted);
+  const rated = words.filter(w => w.stars);
+  const avg = rated.length ? (rated.reduce((s, w) => s + w.stars, 0) / rated.length).toFixed(1) : '—';
+  const weak = words.filter(w => (w.stars || 0) < 5);
+  const last = words.reduce((m, w) => Math.max(m, w.updatedAt || 0), 0);
+  const rows = words.slice().sort((a, b) => (a.stars || 0) - (b.stars || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+  return `<div class="nb">
+    <h3>${esc(nb.profile?.name || nb.slug || '學生')} 的單字本</h3>
+    <div class="meta">${last ? '最後更新 ' + new Date(last).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + '・' : ''}${esc(url)}</div>
+    <div class="st"><span>單字 <b>${words.length}</b></span><span>平均熟悉度 <b>${avg}</b> ★</span><span>待加強（未滿 5★）<b>${weak.length}</b></span></div>
+    ${rows.length ? `<table><tr><th>單字</th><th>意思</th><th>分類</th><th>熟悉度</th><th>備註</th></tr>${rows.map(w =>
+      `<tr><td><b>${esc(w.w)}</b></td><td>${esc(w.meaning)}</td><td>${esc(w.kind)}</td><td class="stars">${starText(w.stars)}</td><td style="color:var(--mute)">${esc(w.note)}</td></tr>`).join('')}</table>` : '<p style="color:var(--mute);font-size:13px;margin:0">還沒有單字。</p>'}
+  </div>`;
+}
+async function renderStudents() {
+  $('#viewTitle').textContent = '學生單字本';
+  $('#view').innerHTML = `<div class="new"><button class="btn" id="stBack" type="button">← 返回列表</button><button class="btn" id="stReload" type="button">重新整理</button></div><div id="nbs"><p style="color:var(--mute)">讀取中…</p></div>`;
+  $('#stBack').onclick = () => go('list');
+  $('#stReload').onclick = () => renderStudents();
+  const box = $('#nbs');
+  if (DEMO) { box.innerHTML = notebookHtml(DEMO_NOTEBOOK) + '<p style="font-size:12px;color:var(--mute)">示範資料。正式版會自動列出每位學生的單字本（唯讀）。</p>'; return; }
+  if (!S.keys) { box.innerHTML = '<p style="color:var(--mute)">正在建立老師金鑰，請稍候再按「重新整理」。</p>'; ensureTeacherKey(); return; }
+  try {
+    const paths = await listNotebooks();
+    if (!paths.length) { box.innerHTML = '<div class="empty">還沒有學生單字本。在「設定 → 學生連線 QR」讓學生掃描後建立。</div>'; return; }
+    const nbs = await Promise.all(paths.map(p => openNotebook(p).catch(() => ({ slug: p, error: true }))));
+    if (S.view !== 'students') return;
+    box.innerHTML = nbs.filter(Boolean).map(nb => nb.error ? `<div class="nb"><h3>${esc(nb.slug)}</h3><p style="color:var(--bad);font-size:13px;margin:0">無法開啟。這本可能是在老師金鑰更換前建立的，請學生打開單字本一次。</p></div>` : notebookHtml(nb)).join('')
+      + '<p style="font-size:12px;color:var(--mute)">唯讀。學生在自己的單字本修改後，按「重新整理」就會看到。</p>';
+  } catch (e) { box.innerHTML = `<p style="color:var(--bad)">${e.message === 'TOKEN' ? 'GitHub token 沒有權限' : '無法連線'}</p>`; }
+}
+
 /* ---------------- word summary ---------------- */
 function showWordSummary() {
   const f = S.filter;
@@ -976,7 +1064,7 @@ $('#settingsBtn').onclick = () => {
       await pullOnly();
       const salt = crypto.getRandomValues(new Uint8Array(16));
       const key = await deriveKey(a, salt);
-      const blob = await seal(key, salt, { entries: S.entries });
+      const blob = await seal(key, salt, { entries: S.entries, keys: S.keys });
       const res = await ghPut(blob, S.remoteSha);
       if (res.conflict) throw new Error('剛好有其他更新，請再試一次');
       S.remoteSha = res.sha; S.dataSalt = salt; S.dataKey = key; S.password = a; S.dirty = false;
@@ -1030,6 +1118,8 @@ function startDemo() {
       p_content: '倒裝句與 L3 後半課文', p_highlight: '單字小考從 14 分進步到 17 分', p_improve: '倒裝句', p_method: '看到 Not until / Only 先圈起來，再檢查助動詞', reflection: '學生開始主動問問題了。' }),
   ];
   S.dataKey = 'demo'; S.password = null; S.token = null;
+  DEMO_NOTEBOOK = { slug: '', profile: { name: who }, words: [['environment','環境','拼錯','我寫成 enviroment',2],['recipe','食譜','聽不出來','我聽成 receipt',3],['affect','影響（動詞）','容易混淆','和 effect 搞混',1],['renowned','有名的','新學的字','be renowned for',4],['debt','債務','聽不出來','b 不發音',5]]
+    .map(([w, meaning, kind, note, stars], i) => ({ id: 'n' + i, w, meaning, kind, note, stars, createdAt: t - i * 1e6, updatedAt: t })) };
   $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
   $('#lockNowBtn').classList.add('hidden');
   const b = document.createElement('div'); b.className = 'demo';

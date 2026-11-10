@@ -100,6 +100,23 @@ textarea{min-height:60px;resize:vertical}
 .cam{position:relative;width:100%;aspect-ratio:1/1;background:#000;border-radius:8px;overflow:hidden}
 .cam video{width:100%;height:100%;object-fit:cover;display:block}
 .cam .frame{position:absolute;inset:18%;border:3px solid rgba(255,255,255,.9);border-radius:12px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
+.quiz{position:fixed;inset:0;background:var(--bg);z-index:15;display:flex;flex-direction:column;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+.quiz .qtop{display:flex;justify-content:space-between;align-items:center;gap:8px;max-width:520px;width:100%;margin:0 auto 10px}
+.quiz .prog{flex:1;height:6px;background:#e3e8ee;border-radius:3px;overflow:hidden}
+.quiz .prog div{height:100%;background:var(--main);transition:width .2s}
+.flip{flex:1;max-width:520px;width:100%;margin:0 auto;perspective:1200px;cursor:pointer;min-height:0}
+.flip .in{position:relative;width:100%;height:100%;transition:transform .35s;transform-style:preserve-3d}
+.flip.back .in{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border:1px solid var(--line);border-radius:14px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;box-shadow:0 2px 10px rgba(29,36,48,.06)}
+.face.b{transform:rotateY(180deg);background:var(--panel)}
+.face .big{font-size:clamp(30px,9vw,46px);font-weight:700;word-break:break-word;line-height:1.15}
+.face .mean{font-size:clamp(22px,6vw,30px);font-weight:700;margin-top:10px}
+.face .hint2{position:absolute;bottom:14px;left:0;right:0;font-size:13px;color:var(--mute)}
+.qbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:520px;width:100%;margin:12px auto 0}
+.qbtns .btn{padding:14px;font-size:16px}
+.qbtns .no{color:var(--bad);border-color:#f0c4c0}
+.qbtns .yes{background:var(--ok);border-color:var(--ok);color:#fff}
+.opt{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:6px;font-size:14px;z-index:20}
 </style>
 </head>
@@ -215,10 +232,10 @@ async function unseal(key, blob) {
 }
 
 /* github */
-const API = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${DATA_PATH}`;
+const apiUrl = (p = DATA_PATH) => `https://api.github.com/repos/${OWNER}/${REPO}/contents/${p}`;
 const H = () => ({ 'Accept': 'application/vnd.github+json', 'Authorization': `Bearer ${S.token}`, 'X-GitHub-Api-Version': '2022-11-28' });
-async function ghGet() {
-  const r = await fetch(`${API}?ref=${BRANCH}&t=${Date.now()}`, { headers: H(), cache: 'no-store' });
+async function ghGet(path) {
+  const r = await fetch(`${apiUrl(path)}?ref=${BRANCH}&t=${Date.now()}`, { headers: H(), cache: 'no-store' });
   if (r.status === 404) {
     const rr = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}`, { headers: H(), cache: 'no-store' });
     if (!rr.ok) throw new Error('TOKEN');
@@ -233,21 +250,51 @@ async function ghGet() {
 async function ghPut(blob, sha) {
   const body = { message: `student words ${new Date().toISOString()}`, content: btoa(JSON.stringify(blob)), branch: BRANCH };
   if (sha) body.sha = sha;
-  const r = await fetch(API, { method: 'PUT', headers: { ...H(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const r = await fetch(apiUrl(), { method: 'PUT', headers: { ...H(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (r.status === 409 || r.status === 422) return { conflict: true };
   if (!r.ok) throw new Error(r.status === 401 || r.status === 403 || r.status === 404 ? 'TOKEN' : 'NET');
   return { sha: (await r.json()).content.sha };
 }
 
+/* envelope: words are encrypted with a random content key (DEK); the DEK is locked twice —
+   with the student's password (wk) and with the teacher's public key (tk) — so the teacher can read the notebook. */
+let TEACHER_PUB = null, TEACHER_N = '';
+const RSA = { name: 'RSA-OAEP', hash: 'SHA-256' };
+async function loadTeacherPub() {
+  if (TEACHER_PUB || DEMO) return;
+  try { const r = await ghGet('data/teacher.pub.json'); if (r && r.blob.n) { TEACHER_PUB = await crypto.subtle.importKey('jwk', { ...r.blob, ext: true }, RSA, false, ['encrypt']); TEACHER_N = r.blob.n.slice(0, 24); } } catch {}
+}
+async function ensureDek() {
+  if (S.dek) return;
+  S.dekRaw = crypto.getRandomValues(new Uint8Array(32));
+  S.dek = await crypto.subtle.importKey('raw', S.dekRaw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+async function sealData(pwKey, salt, obj) {
+  await ensureDek();
+  const iv = crypto.getRandomValues(new Uint8Array(12)), wiv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, S.dek, enc.encode(JSON.stringify(obj)));
+  const wk = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: wiv }, pwKey, S.dekRaw);
+  const out = { v: 2, kdf: 'PBKDF2-SHA256', iter: ITER, salt: b64(salt), iv: b64(iv), ct: b64(ct), wk: { iv: b64(wiv), ct: b64(wk) } };
+  if (TEACHER_PUB) { out.tk = b64(await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, TEACHER_PUB, S.dekRaw)); out.tkn = TEACHER_N; }
+  return out;
+}
+async function openData(pwKey, blob) {
+  if (blob.v !== 2) return unseal(pwKey, blob); // old format: next save upgrades it
+  const raw = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(blob.wk.iv) }, pwKey, unb64(blob.wk.ct)));
+  S.dekRaw = raw; S.dek = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+  return JSON.parse(dec.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(blob.iv) }, S.dek, unb64(blob.ct))));
+}
+const needsTeacherLock = blob => TEACHER_PUB && (blob.v !== 2 || blob.tkn !== TEACHER_N);
+
 /* data */
 const merge = (a, b) => { const m = new Map(); for (const e of [...a, ...b]) { const c = m.get(e.id); if (!c || (e.updatedAt || 0) > (c.updatedAt || 0)) m.set(e.id, e); } return [...m.values()]; };
 const mergeProfile = (a = {}, b = {}) => ((b.updatedAt || 0) > (a.updatedAt || 0) ? b : a);
 const payload = () => ({ words: S.words, profile: S.profile });
-async function saveLocal() { if (DEMO) return; if (S.dataKey) ls.set(LS_LOCAL, JSON.stringify(await seal(S.dataKey, S.dataSalt, { ...payload(), dirty: S.dirty }))); }
+async function saveLocal() { if (DEMO) return; if (S.dataKey) ls.set(LS_LOCAL, JSON.stringify(await sealData(S.dataKey, S.dataSalt, { ...payload(), dirty: S.dirty }))); }
 async function adopt(blob) {
-  if (blob.salt === b64(S.dataSalt)) return unseal(S.dataKey, blob);
+  if (blob.salt === b64(S.dataSalt)) return openData(S.dataKey, blob);
   const salt = unb64(blob.salt), key = await deriveKey(S.password, salt);
-  let d; try { d = await unseal(key, blob); } catch { throw new Error('SALT'); }
+  let d; try { d = await openData(key, blob); } catch { throw new Error('SALT'); }
   S.dataSalt = salt; S.dataKey = key; return d;
 }
 function setStatus(k, t) { $('#syncDot').className = 'dot ' + (k || ''); $('#syncText').textContent = t; }
@@ -260,7 +307,8 @@ async function sync() {
       const remote = await ghGet();
       if (remote) { const r = await adopt(remote.blob); S.words = merge(S.words, r.words || []); S.profile = mergeProfile(S.profile, r.profile); S.remoteSha = remote.sha; }
       else S.remoteSha = null;
-      const res = await ghPut(await seal(S.dataKey, S.dataSalt, payload()), S.remoteSha);
+      await loadTeacherPub();
+      const res = await ghPut(await sealData(S.dataKey, S.dataSalt, payload()), S.remoteSha);
       if (res.conflict) continue;
       S.remoteSha = res.sha; S.dirty = false; await saveLocal();
       setStatus('ok', '已儲存 ' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }));
@@ -277,7 +325,7 @@ async function changed() { S.dirty = true; await saveLocal(); setStatus('busy', 
 /* lock */
 let mode = 'unlock';
 function showLock(msg) {
-  Object.assign(S, { password: null, token: null, dataKey: null, dataSalt: null, words: [], profile: {} });
+  Object.assign(S, { password: null, token: null, dataKey: null, dataSalt: null, dek: null, dekRaw: null, words: [], profile: {} }); stopQuiz();
   $('#app').classList.add('hidden'); $('#lock').classList.remove('hidden'); $('#modalRoot').innerHTML = '';
   ['#pw', '#pw2', '#tok', '#nm'].forEach(s => $(s).value = '');
   const known = !!ls.get(LS_TOKEN) || !!PENDING;
@@ -383,14 +431,14 @@ $('#lockForm').addEventListener('submit', async ev => {
       S.words = []; S.profile = { name: $('#nm').value.trim(), updatedAt: Date.now() }; S.dirty = true;
     } else if (remote) {
       S.dataSalt = unb64(remote.blob.salt); S.dataKey = await deriveKey(pw, S.dataSalt);
-      let d; try { d = await unseal(S.dataKey, remote.blob); } catch { throw new Error('密碼錯誤'); }
+      let d; try { d = await openData(S.dataKey, remote.blob); } catch { throw new Error('密碼錯誤'); }
       S.words = d.words || []; S.profile = d.profile || {}; S.remoteSha = remote.sha;
       const raw = ls.get(LS_LOCAL);
-      if (raw) { try { const b = JSON.parse(raw); if (b.salt === remote.blob.salt) { const l = await unseal(S.dataKey, b); if (l.dirty) { S.words = merge(S.words, l.words || []); S.dirty = true; } } } catch {} }
+      if (raw) { try { const b = JSON.parse(raw); if (b.salt === remote.blob.salt) { const l = await openData(S.dataKey, b); if (l.dirty) { S.words = merge(S.words, l.words || []); S.dirty = true; } } } catch {} }
     } else {
       const raw = ls.get(LS_LOCAL); if (!raw) throw new Error('無法連線，這台裝置也沒有暫存');
       const b = JSON.parse(raw); S.dataSalt = unb64(b.salt); S.dataKey = await deriveKey(pw, S.dataSalt);
-      let d; try { d = await unseal(S.dataKey, b); } catch { throw new Error('密碼錯誤'); }
+      let d; try { d = await openData(S.dataKey, b); } catch { throw new Error('密碼錯誤'); }
       S.words = d.words || []; S.profile = d.profile || {}; S.dirty = !!d.dirty;
     }
     if (!stored || PENDING) { PENDING = null; const salt = crypto.getRandomValues(new Uint8Array(16)); ls.set(LS_TOKEN, JSON.stringify(await seal(await deriveKey(pw, salt), salt, { token }))); }
@@ -398,7 +446,11 @@ $('#lockForm').addEventListener('submit', async ev => {
     $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
     render();
     if (remote === undefined) setStatus('err', '離線：顯示這台裝置的暫存');
-    else if (S.dirty) sync(); else { setStatus('ok', '已同步'); saveLocal(); }
+    else {
+      await loadTeacherPub();
+      if (remote && needsTeacherLock(remote.blob)) S.dirty = true; // let the teacher's key open this notebook
+      if (S.dirty) sync(); else { setStatus('ok', '已同步'); saveLocal(); }
+    }
   } catch (e) { err.textContent = e.message || String(e); }
   finally { btn.disabled = false; btn.textContent = mode === 'setup' ? '建立並開啟' : '開啟'; }
 });
@@ -437,7 +489,7 @@ function render() {
     </div>
     <div class="sec"><span class="sq">1</span><h2>新增單字</h2></div>
     <div class="kinds">${KINDS.map(k => `<button class="kcard" type="button" data-add="${k}">${icon(k)}${k}</button>`).join('')}</div>
-    <div class="sec"><span class="sq">2</span><h2>我的單字</h2></div>
+    <div class="sec"><span class="sq">2</span><h2>我的單字</h2>${all.length ? '<button class="btn pri" id="quizBtn" type="button" style="margin-left:auto">隨機小考</button>' : ''}</div>
     <div class="chips">
       <button class="chip ${!f.kind ? 'on' : ''}" data-kind="">全部<small>${all.length}</small></button>
       <button class="chip ${f.kind === 'weak' ? 'on' : ''}" data-kind="weak">待加強<small>${weak}</small></button>
@@ -474,6 +526,90 @@ function render() {
   });
   $('#q').oninput = e => { f.q = e.target.value; const p = e.target.selectionStart; render(); const q = $('#q'); q.focus(); q.setSelectionRange(p, p); };
   $('#sort').onchange = e => { f.sort = e.target.value; render(); };
+  $('#quizBtn')?.addEventListener('click', openQuizSetup);
+}
+
+/* random quiz (flashcards) */
+const QZ = { deck: [], i: 0, wrong: [], right: 0, flipped: false, again: false };
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function openQuizSetup() {
+  const all = live();
+  const pools = [['all', '全部', all], ['weak', '待加強（未滿 5★）', all.filter(w => (w.stars || 0) < 5)], ...KINDS.map(k => [k, k, all.filter(w => w.kind === k)])].filter(p => p[2].length);
+  let pool = pools.find(p => p[0] === (S.filter.kind || 'all')) ? (S.filter.kind || 'all') : 'all', n = 10;
+  const m = modal(`<h2>隨機小考</h2>
+    <div class="field"><label>範圍</label><div class="opt" id="qPool">${pools.map(([k, l, ws]) => `<button type="button" class="chip ${k === pool ? 'on' : ''}" data-p="${k}">${l}<small>${ws.length}</small></button>`).join('')}</div></div>
+    <div class="field"><label>題數</label><div class="opt" id="qN">${[10, 20, 0].map(x => `<button type="button" class="chip ${x === n ? 'on' : ''}" data-n="${x}">${x || '全部'}</button>`).join('')}</div></div>
+    <p class="hint" style="margin:0">看英文想中文，點卡片翻面，再按「記得」或「不記得」。記得會加 1 顆星，不記得會減 1 顆星。</p>
+    <div class="row"><button class="btn" id="qCancel" type="button">取消</button><button class="btn pri" id="qGo" type="button">開始</button></div>`);
+  m.querySelector('#qPool').onclick = e => { const b = e.target.closest('[data-p]'); if (!b) return; pool = b.dataset.p; m.querySelectorAll('#qPool .chip').forEach(c => c.classList.toggle('on', c === b)); };
+  m.querySelector('#qN').onclick = e => { const b = e.target.closest('[data-n]'); if (!b) return; n = +b.dataset.n; m.querySelectorAll('#qN .chip').forEach(c => c.classList.toggle('on', c === b)); };
+  m.querySelector('#qCancel').onclick = close;
+  m.querySelector('#qGo').onclick = () => {
+    // least familiar words are more likely to be picked
+    const ws = pools.find(p => p[0] === pool)[2].map(w => ({ w, r: Math.random() * (6 - (w.stars || 0)) })).sort((a, b) => b.r - a.r).map(x => x.w);
+    close(); startQuiz(shuffle(n ? ws.slice(0, n) : ws));
+  };
+}
+function startQuiz(words) {
+  Object.assign(QZ, { deck: words.map(w => w.id), i: 0, wrong: [], right: 0, flipped: false });
+  let el = $('#quiz'); if (!el) { el = document.createElement('div'); el.id = 'quiz'; el.className = 'quiz'; document.body.appendChild(el); }
+  document.addEventListener('keydown', quizKeys);
+  drawCard();
+}
+function stopQuiz() { $('#quiz')?.remove(); document.removeEventListener('keydown', quizKeys); }
+function quizKeys(e) {
+  if (!$('#quiz') || e.target.tagName === 'INPUT') return;
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (QZ.i < QZ.deck.length) flipCard(); }
+  else if (QZ.flipped && (e.key === 'ArrowRight' || e.key === 'k')) answer(true);
+  else if (QZ.flipped && (e.key === 'ArrowLeft' || e.key === 'j')) answer(false);
+  else if (e.key === 'Escape') stopQuiz();
+}
+function drawCard() {
+  const el = $('#quiz'); const total = QZ.deck.length;
+  if (QZ.i >= total) return drawResult();
+  const w = S.words.find(x => x.id === QZ.deck[QZ.i]);
+  if (!w || w.deleted) { QZ.i++; return drawCard(); }
+  QZ.flipped = false;
+  el.innerHTML = `<div class="qtop"><button class="btn ghost" id="qExit" type="button">✕ 結束</button><div class="prog"><div style="width:${QZ.i / total * 100}%"></div></div><span class="hint">${QZ.i + 1} / ${total}</span></div>
+    <div class="flip" id="card" role="button" tabindex="0" aria-label="點一下翻面">
+      <div class="in">
+        <div class="face"><span class="tag" style="margin:0 0 14px">${icon(w.kind)}${esc(w.kind)}</span><div class="big">${esc(w.w)}</div><div class="hint2">點一下看中文</div></div>
+        <div class="face b"><div class="big" style="font-size:clamp(22px,6vw,30px);color:var(--mute)">${esc(w.w)}</div>
+          <div class="mean">${w.meaning ? esc(w.meaning) : '<span style="color:var(--mute);font-size:16px;font-weight:400">（還沒寫中文意思）</span>'}</div>
+          ${w.note ? `<div class="hint" style="margin-top:10px;font-size:14px">${esc(w.note)}</div>` : ''}
+          <div style="margin-top:16px">${starsHtml(w.stars, null, true)}</div></div>
+      </div>
+    </div>
+    <div class="qbtns" id="qBtns" style="visibility:hidden"><button class="btn no" id="qNo" type="button">✗ 不記得</button><button class="btn yes" id="qYes" type="button">✓ 記得</button></div>`;
+  el.querySelector('#qExit').onclick = () => { if (QZ.i === 0 || confirm('結束這次小考？已經作答的星星會保留。')) stopQuiz(); };
+  el.querySelector('#card').onclick = flipCard;
+  el.querySelector('#qNo').onclick = () => answer(false);
+  el.querySelector('#qYes').onclick = () => answer(true);
+}
+function flipCard() {
+  const c = $('#card'); if (!c) return;
+  QZ.flipped = !QZ.flipped; c.classList.toggle('back', QZ.flipped);
+  if (QZ.flipped) $('#qBtns').style.visibility = 'visible';
+}
+function answer(knew) {
+  const w = S.words.find(x => x.id === QZ.deck[QZ.i]);
+  if (w) {
+    w.stars = Math.max(1, Math.min(5, (w.stars || 0) + (knew ? 1 : -1)));
+    w.updatedAt = Date.now(); w.quizzedAt = Date.now();
+    if (knew) QZ.right++; else QZ.wrong.push(w.id);
+  }
+  QZ.i++; changed(); drawCard();
+}
+function drawResult() {
+  const el = $('#quiz'); const total = QZ.deck.length; const wrong = QZ.wrong.map(id => S.words.find(w => w.id === id)).filter(Boolean);
+  el.innerHTML = `<div class="qtop"><span></span><span class="hint">完成</span></div>
+    <div style="max-width:520px;width:100%;margin:0 auto;flex:1;overflow:auto">
+      <div style="text-align:center;padding:20px 0 10px"><div style="font-size:44px;font-weight:700">${QZ.right} / ${total}</div><div class="hint" style="font-size:14px">${QZ.right === total ? '全部記得，太棒了！' : '記得的星星已經加上去了'}</div></div>
+      ${wrong.length ? `<div class="sec"><h2>不記得的單字</h2></div>${wrong.map(w => `<div class="word"><div class="main"><span class="w">${esc(w.w)}</span><div class="m">${esc(w.meaning)}</div></div></div>`).join('')}` : ''}
+    </div>
+    <div class="qbtns">${wrong.length ? '<button class="btn" id="qRetry" type="button">再考不記得的</button>' : '<span></span>'}<button class="btn pri" id="qDone" type="button">完成</button></div>`;
+  el.querySelector('#qDone').onclick = () => { stopQuiz(); render(); };
+  el.querySelector('#qRetry')?.addEventListener('click', () => startQuiz(shuffle(wrong)));
 }
 
 /* add / edit sheet */
@@ -551,7 +687,8 @@ $('#settingsBtn').onclick = () => {
       const remote = await ghGet();
       if (remote) { const r = await adopt(remote.blob); S.words = merge(S.words, r.words || []); S.remoteSha = remote.sha; }
       const salt = crypto.getRandomValues(new Uint8Array(16)), key = await deriveKey(a, salt);
-      const res = await ghPut(await seal(key, salt, payload()), S.remoteSha);
+      await loadTeacherPub();
+      const res = await ghPut(await sealData(key, salt, payload()), S.remoteSha);
       if (res.conflict) throw new Error('請再試一次');
       Object.assign(S, { remoteSha: res.sha, dataSalt: salt, dataKey: key, password: a, dirty: false });
       const ts = crypto.getRandomValues(new Uint8Array(16));
