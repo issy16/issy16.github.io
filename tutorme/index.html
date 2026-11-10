@@ -82,7 +82,10 @@ textarea{min-height:64px;resize:vertical;line-height:1.45}
 .wrow{display:grid;grid-template-columns:minmax(0,1.2fr) 130px minmax(0,1.6fr) 32px;gap:6px;align-items:center}
 .wrow .x{border:0;background:none;color:var(--mute);cursor:pointer;font-size:18px;line-height:1;padding:4px}
 .wrow .x:hover{color:var(--bad)}
-.wadd{display:flex;gap:8px;flex-wrap:wrap}
+.wadd{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.kcard{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid transparent;border-radius:8px;padding:14px 16px;cursor:pointer;font-weight:700;font-size:15px;text-align:left;color:var(--ink)}
+.kcard:hover{border-color:var(--main)}
+.kcard svg{width:20px;height:20px;flex:none;color:var(--opt)}
 .wsum h3{font-size:14px;margin:14px 0 6px}
 .wsum table{width:100%;border-collapse:collapse;font-size:13px}
 .wsum td{padding:4px 6px;border-bottom:1px solid #e3e8ee;vertical-align:top}
@@ -481,7 +484,19 @@ const TYPES = {
   diagnosis: { label: '程度診斷', title: '程度診斷（第 1 堂講義）' },
 };
 const ERROR_TYPES = ['單字不會', '片語搭配', '文法觀念', '看錯題目', '閱讀找不到線索', '拼字', '發音 / 重音', '粗心'];
-const WORD_KINDS = ['聽不出來', '拼錯', '其他'];
+const KIND_ICONS = {
+  '聽不出來': '<path d="M6 8.5a6 6 0 1 1 12 0c0 3-2 4.2-3 5.2-.9.9-1 2-1 3.3a3 3 0 0 1-5.6 1.5"/><path d="M9 8.5a3 3 0 0 1 6 0"/>',
+  '拼錯': '<path d="M4 20l4-1 11-11-3-3L5 16l-1 4z"/><path d="M14 6l3 3"/>',
+  '不會的字': '<path d="M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3z"/><path d="M21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z"/>',
+  '新學的字': '<path d="M11 3l1.8 5.2L18 10l-5.2 1.8L11 17l-1.8-5.2L4 10l5.2-1.8z"/><path d="M19 14l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',
+  '難記的字': '<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 3 3 2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><path d="M15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-3 3 2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>',
+  '認得但不會用': '<path d="M12 21a9 9 0 1 0-8-4.9L3 21l4.9-1A9 9 0 0 0 12 21z"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5"/><path d="M12 16.5h.01"/>',
+  '容易混淆': '<path d="M4 8h15l-3-3"/><path d="M20 16H5l3 3"/>',
+  '忘記的字': '<path d="M20 12a8 8 0 1 1-2.3-5.7L20 8"/><path d="M20 4v4h-4"/>',
+};
+const WORD_KINDS = Object.keys(KIND_ICONS);
+const kindIcon = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${KIND_ICONS[k] || ''}</svg>`;
+const NOTE_PH = { '拼錯': '學生寫成…', '容易混淆': '和哪個字混淆…', '聽不出來': '聽成…', '認得但不會用': '例句或用法…' };
 
 // diagnosis answer key (第1堂學生講義 2026-11-10)
 const KEY = {
@@ -611,9 +626,9 @@ function lessonForm() {
     <div class="grid2">${fArea('good', '做得好的地方')}${fArea('mistakes', '常錯的地方（題號、類型、原因）')}</div>
     <div class="field"><label>錯誤類型</label></div>
     <div class="checks">${ERROR_TYPES.map(t => `<label><input type="checkbox" data-arr="errorTypes" value="${esc(t)}" ${errs.includes(t) ? 'checked' : ''}>${esc(t)}</label>`).join('')}</div>
-    ${sec(3, '單字紀錄', '聽不出來：會寫但聽到認不出；拼錯：知道意思但寫錯')}
+    ${sec(3, '單字紀錄')}
     <div class="words" id="wordRows">${wordRowsHtml()}</div>
-    <div class="wadd no-print">${WORD_KINDS.map(k => `<button class="btn" type="button" data-addword="${k}">＋ ${k}</button>`).join('')}</div>
+    <div class="wadd no-print">${WORD_KINDS.map(k => `<button class="kcard" type="button" data-addword="${k}">${kindIcon(k)}${k}</button>`).join('')}</div>
     ${sec(4, '作業與下次準備')}
     <div class="grid2">${fArea('homework', '回家作業（範圍、繳交方式）', 3)}${fArea('nextFocus', '下堂課重點 / 要準備的講義', 3)}</div>
     <div class="grid3">${fDate('examDate', '下次段考')}${fText('examRange', '段考範圍', 'L1 – L3')}${fDate('nextDate', '下次上課')}</div>
@@ -634,21 +649,21 @@ function lessonForm() {
 }
 function wordRowsHtml() {
   const words = S.editing.data.words || [];
-  if (!words.length) return '<div class="note" style="color:var(--mute);font-size:13px">還沒有單字。用下面的按鈕新增。</div>';
+  if (!words.length) return '<div class="note" style="color:var(--mute);font-size:13px">依照學生遇到的問題新增單字</div>';
   return words.map((w, i) => `<div class="wrow">
     <input type="text" data-wi="${i}" data-wf="w" value="${esc(w.w)}" placeholder="正確單字" aria-label="單字">
-    <select data-wi="${i}" data-wf="kind" aria-label="類型">${WORD_KINDS.map(k => `<option ${k === w.kind ? 'selected' : ''}>${k}</option>`).join('')}</select>
-    <input class="wn" type="text" data-wi="${i}" data-wf="note" value="${esc(w.note)}" placeholder="${w.kind === '拼錯' ? '學生寫成…' : '備註（例：聽成 …）'}" aria-label="備註">
+    <select data-wi="${i}" data-wf="kind" aria-label="類型">${[...new Set([...WORD_KINDS, w.kind])].map(k => `<option ${k === w.kind ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
+    <input class="wn" type="text" data-wi="${i}" data-wf="note" value="${esc(w.note)}" placeholder="${NOTE_PH[w.kind] || '備註'}" aria-label="備註">
     <button class="x no-print" type="button" data-delword="${i}" aria-label="刪除這個單字">×</button>
   </div>`).join('');
 }
 function wordLines(words) {
   const ok = (words || []).filter(w => (w.w || '').trim());
   const out = [];
-  for (const k of WORD_KINDS) {
+  for (const k of [...new Set([...WORD_KINDS, ...ok.map(w => w.kind)])]) {
     const g = ok.filter(w => w.kind === k);
     if (!g.length) continue;
-    const list = g.map(w => k === '拼錯' && w.note ? `${w.w.trim()}（不是 ${w.note.trim()}）` : w.w.trim()).join('、');
+    const list = g.map(w => !w.note ? w.w.trim() : k === '拼錯' ? `${w.w.trim()}（不是 ${w.note.trim()}）` : k === '容易混淆' ? `${w.w.trim()}（和 ${w.note.trim()} 混淆）` : w.w.trim()).join('、');
     out.push(`・${k}：${list}`);
   }
   return out;
@@ -841,7 +856,7 @@ function showWordSummary() {
     if (w.note && !it.notes.includes(w.note.trim())) it.notes.push(w.note.trim());
     it.dates.push(e.date); map.set(key, it);
   }
-  const groups = WORD_KINDS.map(k => [k, [...map.values()].filter(x => x.kind === k).sort((a, b) => b.dates.length - a.dates.length || (b.dates[0] || '').localeCompare(a.dates[0] || ''))]);
+  const groups = [...new Set([...WORD_KINDS, ...[...map.values()].map(x => x.kind)])].map(k => [k, [...map.values()].filter(x => x.kind === k).sort((a, b) => b.dates.length - a.dates.length || (b.dates[0] || '').localeCompare(a.dates[0] || ''))]);
   const total = map.size;
   const text = groups.filter(([, g]) => g.length).map(([k, g]) => `【${k}】\n` + g.map(x => x.w + (x.notes.length ? `（${x.notes.join('、')}）` : '')).join('\n')).join('\n\n');
   const m = modal(`<h2>單字總表${f.student ? `・${esc(f.student)}` : ''}</h2>
