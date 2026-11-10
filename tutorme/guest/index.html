@@ -977,12 +977,13 @@ function spellSyllables(word, target) {
   return out.some(x => !x) ? null : out;
 }
 function stressNotation(word, ipa) {
-  const info = ipaInfo(ipa); if (!info || info.count < 2) return '';
+  const info = ipaInfo(ipa); if (!info) return '';
+  if (info.count === 1) return /^[a-z]+$/i.test(word) ? word.toUpperCase() : '';
   const syl = spellSyllables(word, info.count); if (!syl) return '';
   return syl.map((s, i) => i === info.stress ? s.toUpperCase() : s.toLowerCase()).join('-');
 }
 
-const STRESS_RE = /^[a-z]+(-[a-z]+)+$/i;
+const STRESS_RE = /^[a-z]+(-[a-z]+)*$/i;
 const stressOf = w => (w.stress && STRESS_RE.test(w.stress)) ? w.stress : (w.ipa && STRESS_RE.test(w.ipa)) ? w.ipa : stressNotation(w.w || '', w.ipa);
 const stressHtml = s => s ? s.split('-').map(p => p === p.toUpperCase() && /[A-Z]/.test(p) ? `<b style="color:var(--main)">${esc(p)}</b>` : esc(p)).join('·') : '';
 const starText = n => '★'.repeat(n || 0) + `<i>${'★'.repeat(5 - (n || 0))}</i>`;
@@ -1001,7 +1002,7 @@ function notebookHtml(nb, idx) {
     <div class="meta">${last ? '最後更新 ' + new Date(last).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + '・' : ''}${esc(url)}</div>
     <div class="st"><span>單字 <b>${words.length}</b></span><span>平均熟悉度 <b>${avg}</b> ★</span><span>待加強（未滿 5★）<b>${weak.length}</b></span></div>
     ${rows.length ? `<table><tr><th>單字</th><th>意思</th><th>分類</th><th>熟悉度</th><th>備註</th></tr>${rows.map(w =>
-      `<tr><td><b>${esc(w.w)}</b>${stressOf(w) || w.ipa ? `<div style="font-size:12px;color:var(--mute)">${stressHtml(stressOf(w))}${stressOf(w) && w.ipa && !STRESS_RE.test(w.ipa) ? '　' : ''}${STRESS_RE.test(w.ipa || '') ? '' : esc(w.ipa || '')}</div>` : ''}</td><td>${esc(w.meaning)}</td><td>${esc(w.kind)}</td><td class="stars">${starText(w.stars)}</td><td style="color:var(--mute)">${esc(w.note)}</td></tr>`).join('')}</table>` : '<p style="color:var(--mute);font-size:13px;margin:0">還沒有單字。</p>'}
+      `<tr><td><b>${esc(w.w)}</b>${stressOf(w) && stressOf(w).includes('-') ? `<div style="font-size:12px;color:var(--mute)">${stressHtml(stressOf(w))}</div>` : ''}</td><td>${esc(w.meaning)}</td><td>${esc(w.kind)}</td><td class="stars">${starText(w.stars)}</td><td style="color:var(--mute)">${esc(w.note)}</td></tr>`).join('')}</table>` : '<p style="color:var(--mute);font-size:13px;margin:0">還沒有單字。</p>'}
   </div>`;
 }
 async function renderStudents() {
@@ -1055,9 +1056,9 @@ function exportWordSummaryCSV(items, student) {
 function exportNotebookCSV(nbs) {
   const rows = [];
   for (const nb of nbs) for (const w of (nb.words || []).filter(w => !w.deleted))
-    rows.push([nb.profile?.name || nb.slug || '學生', w.w, stressOf(w), w.ipa, w.meaning, w.kind, w.stars || 0, w.note, w.createdAt ? new Date(w.createdAt).toLocaleDateString('zh-TW') : '']);
+    rows.push([nb.profile?.name || nb.slug || '學生', w.w, stressOf(w), w.meaning, w.kind, w.stars || 0, w.note, w.createdAt ? new Date(w.createdAt).toLocaleDateString('zh-TW') : '']);
   const one = nbs.length === 1 && nbs[0].slug ? '-' + nbs[0].slug : '';
-  downloadCSV(`tutorme-notebook${one}-${today()}`, ['學生', '單字', '重音', '音標', '中文意思', '分類', '熟悉度（星）', '備註', '加入日期'], rows);
+  downloadCSV(`tutorme-notebook${one}-${today()}`, ['學生', '單字', '重音', '中文意思', '分類', '熟悉度（星）', '備註', '加入日期'], rows);
 }
 function printNotebook(nb) {
   const words = (nb.words || []).filter(w => !w.deleted).sort((a, b) => (a.stars || 0) - (b.stars || 0) || a.w.localeCompare(b.w));

@@ -116,7 +116,10 @@ textarea{min-height:60px;resize:vertical}
 .ipa{font-family:'Lucida Sans Unicode','Arial Unicode MS','Segoe UI','Noto Sans',sans-serif;color:var(--opt);font-size:17px;margin-top:6px}
 .ipa b{color:var(--main)}
 .stress{font-size:clamp(24px,7vw,34px);letter-spacing:.02em;color:var(--opt);margin-top:8px}
-.stress b{color:var(--main)}
+.stress b,.stressbig b{color:var(--main)}
+.stressbig .dotsep{color:var(--rule);margin:0 2px;font-weight:400}
+.face .big.stressbig{font-weight:500}
+.face .big.stressbig b{font-weight:800}
 .stress .dotsep,.wst .dotsep{color:var(--rule);margin:0 2px;font-weight:400}
 .wst{font-size:14px;color:var(--opt);margin-left:6px}
 .wst b{color:var(--main)}
@@ -516,7 +519,7 @@ function render() {
     </div>
     ${rows.length ? rows.map(w => `<div class="word">
       <div class="main" data-edit="${esc(w.id)}" role="button" tabindex="0">
-        <div><span class="w">${esc(w.w)}</span>${stressOf(w) ? `<span class="wst">${stressHtml(stressOf(w))}</span>` : w.ipa ? `<span class="ipa">${ipaHtml(w.ipa)}</span>` : ''}<span class="tag">${icon(w.kind)}${esc(w.kind)}</span></div>
+        <div><span class="w">${esc(w.w)}</span>${stressOf(w) && stressOf(w).includes('-') ? `<span class="wst">${stressHtml(stressOf(w))}</span>` : ''}<span class="tag">${icon(w.kind)}${esc(w.kind)}</span></div>
         ${w.meaning ? `<div class="m">${esc(w.meaning)}</div>` : ''}
         ${w.note ? `<div class="n">${esc(w.note)}</div>` : ''}
       </div>
@@ -664,12 +667,13 @@ function spellSyllables(word, target) {
   return out.some(x => !x) ? null : out;
 }
 function stressNotation(word, ipa) {
-  const info = ipaInfo(ipa); if (!info || info.count < 2) return '';
+  const info = ipaInfo(ipa); if (!info) return '';
+  if (info.count === 1) return /^[a-z]+$/i.test(word) ? word.toUpperCase() : '';
   const syl = spellSyllables(word, info.count); if (!syl) return '';
   return syl.map((s, i) => i === info.stress ? s.toUpperCase() : s.toLowerCase()).join('-');
 }
 
-const STRESS_RE = /^[a-z]+(-[a-z]+)+$/i;
+const STRESS_RE = /^[a-z]+(-[a-z]+)*$/i;
 const stressOf = w => (w.stress && STRESS_RE.test(w.stress)) ? w.stress : (w.ipa && STRESS_RE.test(w.ipa)) ? w.ipa : stressNotation(w.w || '', w.ipa);
 const stressHtml = s => s ? s.split('-').map(p => p === p.toUpperCase() && /[A-Z]/.test(p) ? `<b>${esc(p)}</b>` : esc(p)).join('<span class="dotsep">·</span>') : '';
 const ipaHtml = s => esc(s || '').replace(/ˈ([^ˈˌ.\/\s]+)/g, 'ˈ<b>$1</b>');
@@ -725,10 +729,8 @@ function drawCard() {
   el.innerHTML = `<div class="qtop"><button class="btn ghost" id="qExit" type="button">✕ 結束</button><div class="prog"><div style="width:${QZ.i / total * 100}%"></div></div><span class="hint">${QZ.i + 1} / ${total}</span></div>
     <div class="flip" id="card" role="button" tabindex="0" aria-label="點一下翻面">
       <div class="in">
-        <div class="face"><div class="big">${esc(w.w)}</div><button class="spk" type="button" data-say style="margin-top:18px" aria-label="播放發音">${SPK}</button><div class="hint2">點一下看中文</div></div>
-        <div class="face b"><div style="display:flex;align-items:center;gap:10px;justify-content:center"><div class="big" style="font-size:clamp(22px,6vw,30px);color:var(--mute)">${esc(w.w)}</div><button class="spk sm" type="button" data-say aria-label="播放發音">${SPK}</button></div>
-          <div class="stress" id="cardStress">${stressHtml(stressOf(w))}</div>
-          <div class="ipa" id="cardIpa" style="font-size:14px">${STRESS_RE.test(w.ipa || '') ? '' : ipaHtml(w.ipa)}</div>
+        <div class="face"><div class="big stressbig" id="cardFront">${stressOf(w) ? stressHtml(stressOf(w)) : esc(w.w)}</div><button class="spk" type="button" data-say style="margin-top:18px" aria-label="播放發音">${SPK}</button><div class="hint2">點一下看中文</div></div>
+        <div class="face b"><div style="display:flex;align-items:center;gap:10px;justify-content:center"><div class="stress" id="cardStress" style="margin-top:0">${stressOf(w) ? stressHtml(stressOf(w)) : esc(w.w)}</div><button class="spk sm" type="button" data-say aria-label="播放發音">${SPK}</button></div>
           <div class="mean">${w.meaning ? esc(w.meaning) : '<span style="color:var(--mute);font-size:16px;font-weight:400">（還沒寫中文意思）</span>'}</div>
           ${w.note ? `<div class="hint" style="margin-top:10px;font-size:14px">${esc(w.note)}</div>` : ''}
           <div style="margin-top:16px">${starsHtml(w.stars, null, true)}</div></div>
@@ -737,7 +739,7 @@ function drawCard() {
     <div class="qbtns" id="qBtns" style="visibility:hidden"><button class="btn no" id="qNo" type="button">✗ 不記得</button><button class="btn yes" id="qYes" type="button">✓ 記得</button></div>`;
   el.querySelector('#qExit').onclick = () => { if (QZ.i === 0 || confirm('結束這次小考？已經作答的星星會保留。')) stopQuiz(); };
   el.querySelector('#card').onclick = e => { if (e.target.closest('[data-say]')) { e.stopPropagation(); speak(w); return; } flipCard(); };
-  if (!w.ipa && !w.pronChecked) ensurePron(w).then(() => { if (QZ.deck[QZ.i] !== w.id) return; const ip = $('#cardIpa'), st = $('#cardStress'); if (ip) ip.innerHTML = ipaHtml(w.ipa); if (st) st.innerHTML = stressHtml(stressOf(w)); });
+  if (!w.ipa && !w.pronChecked) ensurePron(w).then(() => { if (QZ.deck[QZ.i] !== w.id || !stressOf(w)) return; const fr = $('#cardFront'), st = $('#cardStress'); if (fr) fr.innerHTML = stressHtml(stressOf(w)); if (st) st.innerHTML = stressHtml(stressOf(w)); });
   el.querySelector('#qNo').onclick = () => answer(false);
   el.querySelector('#qYes').onclick = () => answer(true);
 }
@@ -773,7 +775,7 @@ const bookName = () => (S.profile.name ? S.profile.name + ' 的' : '') + '單字
 function exportCSV() {
   const q = v => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const rows = live().sort((a, b) => (a.stars || 0) - (b.stars || 0) || a.w.localeCompare(b.w));
-  const csv = '﻿' + [['單字', '重音', '音標', '中文意思', '分類', '熟悉度（星）', '備註', '加入日期'], ...rows.map(w => [w.w, stressOf(w), w.ipa, w.meaning, w.kind, w.stars || 0, w.note, w.createdAt ? new Date(w.createdAt).toLocaleDateString('zh-TW') : ''])].map(r => r.map(q).join(',')).join('\r\n');
+  const csv = '﻿' + [['單字', '重音', '中文意思', '分類', '熟悉度（星）', '備註', '加入日期'], ...rows.map(w => [w.w, stressOf(w), w.meaning, w.kind, w.stars || 0, w.note, w.createdAt ? new Date(w.createdAt).toLocaleDateString('zh-TW') : ''])].map(r => r.map(q).join(',')).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = `wordbook${slug ? '-' + slug : ''}-${today()}.csv`;
   document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1500); setTimeout(() => URL.revokeObjectURL(a.href), 1500); toast('已匯出');
 }
@@ -816,10 +818,9 @@ function openSheet(w) {
   const m = modal(`<h2>${icon(cur.kind)}${isNew ? '新增：' : ''}${esc(cur.kind)}</h2>
     <form id="wf" autocomplete="off">
       <div class="field"><label for="ww">單字</label><input id="ww" type="text" value="${esc(cur.w)}" autocapitalize="off" autocorrect="off" spellcheck="false" required></div>
-      <div class="field"><label for="wi">發音 / 重音</label><div style="display:flex;gap:6px"><input id="wi" type="text" value="${esc(cur.ipa)}" placeholder="打完單字會自動查詢，例：/ɪnˈvaɪrənmənt/" autocapitalize="off" spellcheck="false" style="font-family:'Lucida Sans Unicode','Arial Unicode MS','Segoe UI',sans-serif"><button class="spk sm" type="button" id="wSay" aria-label="播放發音" style="width:40px;height:40px">${SPK}</button></div>
-        <span class="hint">音標會自動查詢，ˈ 後面的音節是重音。</span></div>
-      <div class="field"><label for="wst">重音標記</label><input id="wst" type="text" value="${esc(cur.stress || stressNotation(cur.w || '', cur.ipa))}" placeholder="例：en-VI-ron-ment（重音音節大寫）" autocapitalize="off" spellcheck="false">
-        <span class="hint">用 - 分音節，重音音節用大寫。查不到時可以自己寫。</span></div>
+      <input id="wi" type="hidden" value="${esc(STRESS_RE.test(cur.ipa || '') ? '' : cur.ipa)}">
+      <div class="field"><label for="wst">重音標記</label><div style="display:flex;gap:6px"><input id="wst" type="text" value="${esc(stressOf(cur))}" placeholder="打完單字會自動產生，例：en-VI-ron-ment" autocapitalize="off" spellcheck="false"><button class="spk sm" type="button" id="wSay" aria-label="播放發音" style="width:40px;height:40px">${SPK}</button></div>
+        <span class="hint">用 - 分音節，重音音節用大寫。自動產生不了時可以自己寫。</span></div>
       <div class="field"><label for="wm">中文意思</label><input id="wm" type="text" value="${esc(cur.meaning)}"></div>
       <div class="field"><label for="wn">備註</label><input id="wn" type="text" value="${esc(cur.note)}" placeholder="${NOTE_PH[cur.kind] || '例句、提醒…'}"></div>
       <div class="field"><label for="wk">分類</label><select id="wk">${KINDS.map(k => `<option ${k === cur.kind ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
@@ -834,18 +835,17 @@ function openSheet(w) {
   const autoPron = async () => {
     const word = wwIn.value.trim(); if (!word || word === looked) return; looked = word;
     if (wiIn.value.trim() && word === cur.w) return;
-    wiIn.placeholder = '查詢中…';
+    const stIn0 = m.querySelector('#wst'); if (!stIn0.value.trim()) stIn0.placeholder = '查詢中…';
     const p = await lookupPron(word);
     if (wwIn.value.trim() !== word) return;
-    wiIn.placeholder = p?.ipa ? '' : '查不到，可以自己寫，例：en-VI-ron-ment';
+    stIn0.placeholder = '打完單字會自動產生，例：en-VI-ron-ment';
     if (p?.ipa && (!wiIn.value.trim() || wiIn.dataset.auto)) { wiIn.value = p.ipa; wiIn.dataset.auto = '1'; }
     const stIn = m.querySelector('#wst');
-    if (stIn && (!stIn.value.trim() || stIn.dataset.auto)) { stIn.value = stressNotation(word, wiIn.value); stIn.dataset.auto = '1'; }
+    if (stIn && (!stIn.value.trim() || stIn.dataset.auto)) { stIn.value = stressNotation(word, wiIn.value); stIn.dataset.auto = '1'; if (!stIn.value) stIn.placeholder = '自動產生不了，可以自己寫，例：COMF-ta-ble'; }
     cur.audio = p?.audio || ''; cur.pronChecked = true;
   };
   wwIn.addEventListener('blur', autoPron);
   wwIn.addEventListener('input', () => { clearTimeout(wwIn._t); wwIn._t = setTimeout(autoPron, 900); });
-  wiIn.addEventListener('input', () => { delete wiIn.dataset.auto; const stIn = m.querySelector('#wst'); if (stIn.dataset.auto || !stIn.value.trim()) { stIn.value = stressNotation(wwIn.value.trim(), wiIn.value); stIn.dataset.auto = '1'; } });
   m.querySelector('#wst').addEventListener('input', e => { delete e.target.dataset.auto; });
   m.querySelector('#wSay').onclick = () => speak({ w: wwIn.value.trim(), audio: wwIn.value.trim() === looked || wwIn.value.trim() === cur.w ? cur.audio : '' });
   const ws = m.querySelector('#ws');
