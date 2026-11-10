@@ -902,6 +902,89 @@ async function openNotebook(path) {
   const data = JSON.parse(dec.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(blob.iv) }, dek, unb64(blob.ct))));
   return { slug, ...data };
 }
+// Word stress notation (en·VI·ron·ment) from spelling + dictionary IPA.
+// IPA gives the syllable count and which syllable carries primary stress (ˈ);
+// spelling is split with simple English syllable rules, then reconciled to that count.
+const IPA_V = 'aeiouæɑɒɔəɛɜɪʊʌyɐɘɵʉɨœøɚɝ';
+function ipaInfo(ipa) {
+  let s = String(ipa || '').replace(/[\/\[\]()]/g, '').trim();
+  if (!s || /\s/.test(s)) return null;               // phrases: skip
+  s = s.replace(/[ːˑ̃]/g, '');
+  let count = 0, stress = -1, inV = false, pending = false;
+  for (const ch of s) {
+    if (ch === 'ˈ') { pending = true; inV = false; continue; }
+    if (ch === 'ˌ' || ch === '.') { inV = false; continue; }
+    const v = IPA_V.includes(ch) || ch === '̩';   // syllabic consonant mark
+    if (v && !inV) { if (pending) { stress = count; pending = false; } count++; }
+    inV = v && ch !== '̩';
+  }
+  if (!count) return null;
+  return { count, stress: stress < 0 ? 0 : stress };
+}
+const DIGRAPH = ['ch', 'sh', 'th', 'ph', 'wh', 'gh', 'ck', 'qu', 'gu'];
+const ONSET2 = ['bl', 'br', 'cl', 'cr', 'dr', 'fl', 'fr', 'gl', 'gr', 'pl', 'pr', 'tr', 'tw', 'wr', 'sc', 'sk', 'sl', 'sm', 'sn', 'sp', 'st', 'sw'];
+const ONSET3 = ['str', 'spr', 'scr', 'spl', 'thr', 'shr', 'squ'];
+const HIATUS = ['ia', 'io', 'iu', 'eo', 'ua', 'uo', 'ue', 'ui', 'ea', 'oe', 'ie', 'eu', 'ao', 'oa', 'ii'];
+function spellSyllables(word, target) {
+  const w = word.toLowerCase();
+  if (!/^[a-z]+$/.test(w)) return null;
+  // vowel groups (y is a vowel unless word-initial; w after a vowel joins it: ow, aw, ew)
+  const isV = (i) => 'aeiou'.includes(w[i]) || (w[i] === 'y' && i > 0) || (w[i] === 'w' && i > 0 && 'aeo'.includes(w[i - 1]) && (i + 1 >= w.length || !'aeiou'.includes(w[i + 1])));
+  let groups = []; // [start, end)
+  for (let i = 0; i < w.length;) {
+    if (isV(i)) { let j = i; while (j < w.length && isV(j)) j++; groups.push([i, j]); i = j; } else i++;
+  }
+  // "qu"/"gu"+vowel: the u is a consonant
+  groups = groups.map(([a, b]) => (w[a] === 'u' && a > 0 && 'qg'.includes(w[a - 1]) && b - a > 1) ? [a + 1, b] : [a, b]);
+  if (!groups.length) return null;
+  const n = () => groups.length;
+  // too many: silent endings
+  const tryDrop = () => {
+    const [a, b] = groups[n() - 1], tail = w.slice(a);
+    const prev = w[a - 1] || '';
+    if (n() > 1 && (tail === 'e' || tail === 'es' && !/[sxzh]/.test(prev) || tail === 'ed' && !/[td]/.test(prev) || tail === 'ue') && !(tail === 'e' && prev === 'l' && !'aeiou'.includes(w[a - 2] || 'a'))) { groups.pop(); return true; }
+    return false;
+  };
+  while (n() > target && tryDrop());
+  // too few: split hiatus vowel pairs, then consonant + le
+  for (let k = 0; k < groups.length && n() < target; k++) {
+    const [a, b] = groups[k];
+    for (let i = a; i < b - 1 && n() < target; i++) {
+      if (HIATUS.includes(w.slice(i, i + 2)) && !(w.slice(i, i + 2) === 'ue' && i + 2 === w.length)) { groups.splice(k, 1, [a, i + 1], [i + 1, b]); break; }
+    }
+  }
+  if (n() !== target) return null;
+  // cut points between groups
+  const cuts = [];
+  for (let k = 0; k < n() - 1; k++) {
+    const s = groups[k][1], e = groups[k + 1][0], c = w.slice(s, e);
+    let cut;
+    if (c.length === 0) cut = s;
+    else if (c.length === 1) cut = c === 'x' ? e : s;            // V-CV (x stays: ex-it)
+    else if (c.length === 2) cut = DIGRAPH.includes(c) ? (c === 'ck' ? e : s) : c[1] === 'x' ? e : c[0] === 's' ? s + 1 : ONSET2.includes(c) ? s : s + 1;
+    else {
+      const last3 = c.slice(-3), last2 = c.slice(-2);
+      if (ONSET3.includes(last3)) cut = e - 3;
+      else if (DIGRAPH.includes(last2) && last2 !== 'ck') cut = e - 2;
+      else if (ONSET2.includes(last2) && !/^s/.test(last2)) cut = e - 2;
+      else cut = s + 1 + (DIGRAPH.includes(c.slice(0, 2)) ? 1 : 0);
+    }
+    cuts.push(cut);
+  }
+  const out = []; let p = 0;
+  for (const c of cuts) { out.push(word.slice(p, c)); p = c; }
+  out.push(word.slice(p));
+  return out.some(x => !x) ? null : out;
+}
+function stressNotation(word, ipa) {
+  const info = ipaInfo(ipa); if (!info || info.count < 2) return '';
+  const syl = spellSyllables(word, info.count); if (!syl) return '';
+  return syl.map((s, i) => i === info.stress ? s.toUpperCase() : s.toLowerCase()).join('-');
+}
+
+const STRESS_RE = /^[a-z]+(-[a-z]+)+$/i;
+const stressOf = w => (w.stress && STRESS_RE.test(w.stress)) ? w.stress : (w.ipa && STRESS_RE.test(w.ipa)) ? w.ipa : stressNotation(w.w || '', w.ipa);
+const stressHtml = s => s ? s.split('-').map(p => p === p.toUpperCase() && /[A-Z]/.test(p) ? `<b style="color:var(--main)">${esc(p)}</b>` : esc(p)).join('·') : '';
 const starText = n => '★'.repeat(n || 0) + `<i>${'★'.repeat(5 - (n || 0))}</i>`;
 function notebookHtml(nb, idx) {
   const url = new URL('student/' + (nb.slug ? '?s=' + nb.slug : ''), location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '')).href;
@@ -918,7 +1001,7 @@ function notebookHtml(nb, idx) {
     <div class="meta">${last ? '最後更新 ' + new Date(last).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + '・' : ''}${esc(url)}</div>
     <div class="st"><span>單字 <b>${words.length}</b></span><span>平均熟悉度 <b>${avg}</b> ★</span><span>待加強（未滿 5★）<b>${weak.length}</b></span></div>
     ${rows.length ? `<table><tr><th>單字</th><th>意思</th><th>分類</th><th>熟悉度</th><th>備註</th></tr>${rows.map(w =>
-      `<tr><td><b>${esc(w.w)}</b>${w.ipa ? `<div style="font-size:12px;color:var(--mute)">${esc(w.ipa)}</div>` : ''}</td><td>${esc(w.meaning)}</td><td>${esc(w.kind)}</td><td class="stars">${starText(w.stars)}</td><td style="color:var(--mute)">${esc(w.note)}</td></tr>`).join('')}</table>` : '<p style="color:var(--mute);font-size:13px;margin:0">還沒有單字。</p>'}
+      `<tr><td><b>${esc(w.w)}</b>${stressOf(w) || w.ipa ? `<div style="font-size:12px;color:var(--mute)">${stressHtml(stressOf(w))}${stressOf(w) && w.ipa && !STRESS_RE.test(w.ipa) ? '　' : ''}${STRESS_RE.test(w.ipa || '') ? '' : esc(w.ipa || '')}</div>` : ''}</td><td>${esc(w.meaning)}</td><td>${esc(w.kind)}</td><td class="stars">${starText(w.stars)}</td><td style="color:var(--mute)">${esc(w.note)}</td></tr>`).join('')}</table>` : '<p style="color:var(--mute);font-size:13px;margin:0">還沒有單字。</p>'}
   </div>`;
 }
 async function renderStudents() {
@@ -972,9 +1055,9 @@ function exportWordSummaryCSV(items, student) {
 function exportNotebookCSV(nbs) {
   const rows = [];
   for (const nb of nbs) for (const w of (nb.words || []).filter(w => !w.deleted))
-    rows.push([nb.profile?.name || nb.slug || '學生', w.w, w.ipa, w.meaning, w.kind, w.stars || 0, w.note, w.createdAt ? new Date(w.createdAt).toLocaleDateString('zh-TW') : '']);
+    rows.push([nb.profile?.name || nb.slug || '學生', w.w, stressOf(w), w.ipa, w.meaning, w.kind, w.stars || 0, w.note, w.createdAt ? new Date(w.createdAt).toLocaleDateString('zh-TW') : '']);
   const one = nbs.length === 1 && nbs[0].slug ? '-' + nbs[0].slug : '';
-  downloadCSV(`tutorme-notebook${one}-${today()}`, ['學生', '單字', '發音', '中文意思', '分類', '熟悉度（星）', '備註', '加入日期'], rows);
+  downloadCSV(`tutorme-notebook${one}-${today()}`, ['學生', '單字', '重音', '音標', '中文意思', '分類', '熟悉度（星）', '備註', '加入日期'], rows);
 }
 function printNotebook(nb) {
   const words = (nb.words || []).filter(w => !w.deleted).sort((a, b) => (a.stars || 0) - (b.stars || 0) || a.w.localeCompare(b.w));

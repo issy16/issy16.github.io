@@ -115,6 +115,11 @@ textarea{min-height:60px;resize:vertical}
 .spk.sm{width:30px;height:30px}.spk.sm svg{width:16px;height:16px}
 .ipa{font-family:'Lucida Sans Unicode','Arial Unicode MS','Segoe UI','Noto Sans',sans-serif;color:var(--opt);font-size:17px;margin-top:6px}
 .ipa b{color:var(--main)}
+.stress{font-size:clamp(24px,7vw,34px);letter-spacing:.02em;color:var(--opt);margin-top:8px}
+.stress b{color:var(--main)}
+.stress .dotsep,.wst .dotsep{color:var(--rule);margin:0 2px;font-weight:400}
+.wst{font-size:14px;color:var(--opt);margin-left:6px}
+.wst b{color:var(--main)}
 .word .ipa{font-size:13px;margin:0 0 0 6px;display:inline}
 .face .mean{font-size:clamp(22px,6vw,30px);font-weight:700;margin-top:10px}
 .face .hint2{position:absolute;bottom:14px;left:0;right:0;font-size:13px;color:var(--mute)}
@@ -511,7 +516,7 @@ function render() {
     </div>
     ${rows.length ? rows.map(w => `<div class="word">
       <div class="main" data-edit="${esc(w.id)}" role="button" tabindex="0">
-        <div><span class="w">${esc(w.w)}</span>${w.ipa ? `<span class="ipa">${ipaHtml(w.ipa)}</span>` : ''}<span class="tag">${icon(w.kind)}${esc(w.kind)}</span></div>
+        <div><span class="w">${esc(w.w)}</span>${stressOf(w) ? `<span class="wst">${stressHtml(stressOf(w))}</span>` : w.ipa ? `<span class="ipa">${ipaHtml(w.ipa)}</span>` : ''}<span class="tag">${icon(w.kind)}${esc(w.kind)}</span></div>
         ${w.meaning ? `<div class="m">${esc(w.meaning)}</div>` : ''}
         ${w.note ? `<div class="n">${esc(w.note)}</div>` : ''}
       </div>
@@ -540,9 +545,25 @@ function render() {
 /* pronunciation: device voice + dictionary phonetics (ˈ = primary stress, ˌ = secondary) */
 const SPK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></svg>';
 let VOICE = null;
+const LS_VOICE = 'tutorme.voice';
+// macOS ships joke/robotic voices under en-US (Albert, Bells, Zarvox, ...); never pick those.
+const BAD_VOICE = /Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Fred|Junior|Kathy|Ralph|Grandma|Grandpa|Eddy|Flo|Reed|Rocko|Sandy|Shelley|Deranged|Hysterical|Pipe Organ/i;
+function voiceScore(v) {
+  if (!/^en/i.test(v.lang) || BAD_VOICE.test(v.name)) return -1;
+  let s = /en[-_]US/i.test(v.lang) ? 20 : /en[-_](GB|AU|CA|IE|NZ)/i.test(v.lang) ? 10 : 5;
+  if (/Google US English/i.test(v.name)) s += 60;
+  if (/\((Premium|Enhanced)\)|Neural|Natural|Online/i.test(v.name)) s += 50;
+  if (/Samantha|Ava|Allison|Susan|Zoe|Evan|Nathan|Tom|Joelle|Noelle|Aria|Jenny|Guy|Michelle/i.test(v.name)) s += 30;
+  if (/Google UK English/i.test(v.name)) s += 25;
+  if (/Alex|Aaron|Nicky|Daniel|Karen|Moira|Tessa|Serena/i.test(v.name)) s += 15;
+  if (/compact/i.test(v.voiceURI || '')) s -= 10;
+  return s;
+}
+const goodVoices = () => speechSynthesis.getVoices().filter(v => voiceScore(v) >= 0).sort((a, b) => voiceScore(b) - voiceScore(a));
 function pickVoice() {
-  const vs = speechSynthesis.getVoices(); if (!vs.length) return null;
-  return vs.find(v => /en[-_]US/i.test(v.lang) && /Samantha|Google US|Aria|Jenny/i.test(v.name)) || vs.find(v => /en[-_]US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
+  const vs = goodVoices(); if (!vs.length) return null;
+  let want = null; try { want = localStorage.getItem(LS_VOICE); } catch {}
+  return vs.find(v => v.voiceURI === want) || vs[0];
 }
 if ('speechSynthesis' in window) { VOICE = pickVoice(); speechSynthesis.onvoiceschanged = () => { VOICE = pickVoice(); }; }
 const audioCache = {};
@@ -554,7 +575,7 @@ function speak(w) {
 function tts(text) {
   if (!('speechSynthesis' in window)) return toast('這個瀏覽器不支援發音');
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = 0.85; if (VOICE) u.voice = VOICE;
+  const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = 0.95; if (VOICE) { try { u.voice = VOICE; u.lang = VOICE.lang; } catch {} }
   speechSynthesis.speak(u);
 }
 async function lookupPron(word) {
@@ -568,6 +589,89 @@ async function lookupPron(word) {
     return { ipa: us?.text ? ('/' + us.text.replace(/^[\/\[]|[\/\]]$/g, '') + '/') : '', audio };
   } catch { return null; }
 }
+// Word stress notation (en·VI·ron·ment) from spelling + dictionary IPA.
+// IPA gives the syllable count and which syllable carries primary stress (ˈ);
+// spelling is split with simple English syllable rules, then reconciled to that count.
+const IPA_V = 'aeiouæɑɒɔəɛɜɪʊʌyɐɘɵʉɨœøɚɝ';
+function ipaInfo(ipa) {
+  let s = String(ipa || '').replace(/[\/\[\]()]/g, '').trim();
+  if (!s || /\s/.test(s)) return null;               // phrases: skip
+  s = s.replace(/[ːˑ̃]/g, '');
+  let count = 0, stress = -1, inV = false, pending = false;
+  for (const ch of s) {
+    if (ch === 'ˈ') { pending = true; inV = false; continue; }
+    if (ch === 'ˌ' || ch === '.') { inV = false; continue; }
+    const v = IPA_V.includes(ch) || ch === '̩';   // syllabic consonant mark
+    if (v && !inV) { if (pending) { stress = count; pending = false; } count++; }
+    inV = v && ch !== '̩';
+  }
+  if (!count) return null;
+  return { count, stress: stress < 0 ? 0 : stress };
+}
+const DIGRAPH = ['ch', 'sh', 'th', 'ph', 'wh', 'gh', 'ck', 'qu', 'gu'];
+const ONSET2 = ['bl', 'br', 'cl', 'cr', 'dr', 'fl', 'fr', 'gl', 'gr', 'pl', 'pr', 'tr', 'tw', 'wr', 'sc', 'sk', 'sl', 'sm', 'sn', 'sp', 'st', 'sw'];
+const ONSET3 = ['str', 'spr', 'scr', 'spl', 'thr', 'shr', 'squ'];
+const HIATUS = ['ia', 'io', 'iu', 'eo', 'ua', 'uo', 'ue', 'ui', 'ea', 'oe', 'ie', 'eu', 'ao', 'oa', 'ii'];
+function spellSyllables(word, target) {
+  const w = word.toLowerCase();
+  if (!/^[a-z]+$/.test(w)) return null;
+  // vowel groups (y is a vowel unless word-initial; w after a vowel joins it: ow, aw, ew)
+  const isV = (i) => 'aeiou'.includes(w[i]) || (w[i] === 'y' && i > 0) || (w[i] === 'w' && i > 0 && 'aeo'.includes(w[i - 1]) && (i + 1 >= w.length || !'aeiou'.includes(w[i + 1])));
+  let groups = []; // [start, end)
+  for (let i = 0; i < w.length;) {
+    if (isV(i)) { let j = i; while (j < w.length && isV(j)) j++; groups.push([i, j]); i = j; } else i++;
+  }
+  // "qu"/"gu"+vowel: the u is a consonant
+  groups = groups.map(([a, b]) => (w[a] === 'u' && a > 0 && 'qg'.includes(w[a - 1]) && b - a > 1) ? [a + 1, b] : [a, b]);
+  if (!groups.length) return null;
+  const n = () => groups.length;
+  // too many: silent endings
+  const tryDrop = () => {
+    const [a, b] = groups[n() - 1], tail = w.slice(a);
+    const prev = w[a - 1] || '';
+    if (n() > 1 && (tail === 'e' || tail === 'es' && !/[sxzh]/.test(prev) || tail === 'ed' && !/[td]/.test(prev) || tail === 'ue') && !(tail === 'e' && prev === 'l' && !'aeiou'.includes(w[a - 2] || 'a'))) { groups.pop(); return true; }
+    return false;
+  };
+  while (n() > target && tryDrop());
+  // too few: split hiatus vowel pairs, then consonant + le
+  for (let k = 0; k < groups.length && n() < target; k++) {
+    const [a, b] = groups[k];
+    for (let i = a; i < b - 1 && n() < target; i++) {
+      if (HIATUS.includes(w.slice(i, i + 2)) && !(w.slice(i, i + 2) === 'ue' && i + 2 === w.length)) { groups.splice(k, 1, [a, i + 1], [i + 1, b]); break; }
+    }
+  }
+  if (n() !== target) return null;
+  // cut points between groups
+  const cuts = [];
+  for (let k = 0; k < n() - 1; k++) {
+    const s = groups[k][1], e = groups[k + 1][0], c = w.slice(s, e);
+    let cut;
+    if (c.length === 0) cut = s;
+    else if (c.length === 1) cut = c === 'x' ? e : s;            // V-CV (x stays: ex-it)
+    else if (c.length === 2) cut = DIGRAPH.includes(c) ? (c === 'ck' ? e : s) : c[1] === 'x' ? e : c[0] === 's' ? s + 1 : ONSET2.includes(c) ? s : s + 1;
+    else {
+      const last3 = c.slice(-3), last2 = c.slice(-2);
+      if (ONSET3.includes(last3)) cut = e - 3;
+      else if (DIGRAPH.includes(last2) && last2 !== 'ck') cut = e - 2;
+      else if (ONSET2.includes(last2) && !/^s/.test(last2)) cut = e - 2;
+      else cut = s + 1 + (DIGRAPH.includes(c.slice(0, 2)) ? 1 : 0);
+    }
+    cuts.push(cut);
+  }
+  const out = []; let p = 0;
+  for (const c of cuts) { out.push(word.slice(p, c)); p = c; }
+  out.push(word.slice(p));
+  return out.some(x => !x) ? null : out;
+}
+function stressNotation(word, ipa) {
+  const info = ipaInfo(ipa); if (!info || info.count < 2) return '';
+  const syl = spellSyllables(word, info.count); if (!syl) return '';
+  return syl.map((s, i) => i === info.stress ? s.toUpperCase() : s.toLowerCase()).join('-');
+}
+
+const STRESS_RE = /^[a-z]+(-[a-z]+)+$/i;
+const stressOf = w => (w.stress && STRESS_RE.test(w.stress)) ? w.stress : (w.ipa && STRESS_RE.test(w.ipa)) ? w.ipa : stressNotation(w.w || '', w.ipa);
+const stressHtml = s => s ? s.split('-').map(p => p === p.toUpperCase() && /[A-Z]/.test(p) ? `<b>${esc(p)}</b>` : esc(p)).join('<span class="dotsep">·</span>') : '';
 const ipaHtml = s => esc(s || '').replace(/ˈ([^ˈˌ.\/\s]+)/g, 'ˈ<b>$1</b>');
 async function ensurePron(w) {
   if (!w || w.pronChecked || DEMO) return;
@@ -623,7 +727,8 @@ function drawCard() {
       <div class="in">
         <div class="face"><div class="big">${esc(w.w)}</div><button class="spk" type="button" data-say style="margin-top:18px" aria-label="播放發音">${SPK}</button><div class="hint2">點一下看中文</div></div>
         <div class="face b"><div style="display:flex;align-items:center;gap:10px;justify-content:center"><div class="big" style="font-size:clamp(22px,6vw,30px);color:var(--mute)">${esc(w.w)}</div><button class="spk sm" type="button" data-say aria-label="播放發音">${SPK}</button></div>
-          <div class="ipa" id="cardIpa">${ipaHtml(w.ipa)}</div>
+          <div class="stress" id="cardStress">${stressHtml(stressOf(w))}</div>
+          <div class="ipa" id="cardIpa" style="font-size:14px">${STRESS_RE.test(w.ipa || '') ? '' : ipaHtml(w.ipa)}</div>
           <div class="mean">${w.meaning ? esc(w.meaning) : '<span style="color:var(--mute);font-size:16px;font-weight:400">（還沒寫中文意思）</span>'}</div>
           ${w.note ? `<div class="hint" style="margin-top:10px;font-size:14px">${esc(w.note)}</div>` : ''}
           <div style="margin-top:16px">${starsHtml(w.stars, null, true)}</div></div>
@@ -632,7 +737,7 @@ function drawCard() {
     <div class="qbtns" id="qBtns" style="visibility:hidden"><button class="btn no" id="qNo" type="button">✗ 不記得</button><button class="btn yes" id="qYes" type="button">✓ 記得</button></div>`;
   el.querySelector('#qExit').onclick = () => { if (QZ.i === 0 || confirm('結束這次小考？已經作答的星星會保留。')) stopQuiz(); };
   el.querySelector('#card').onclick = e => { if (e.target.closest('[data-say]')) { e.stopPropagation(); speak(w); return; } flipCard(); };
-  if (!w.ipa && !w.pronChecked) ensurePron(w).then(() => { const ip = $('#cardIpa'); if (ip && QZ.deck[QZ.i] === w.id) ip.innerHTML = ipaHtml(w.ipa); });
+  if (!w.ipa && !w.pronChecked) ensurePron(w).then(() => { if (QZ.deck[QZ.i] !== w.id) return; const ip = $('#cardIpa'), st = $('#cardStress'); if (ip) ip.innerHTML = ipaHtml(w.ipa); if (st) st.innerHTML = stressHtml(stressOf(w)); });
   el.querySelector('#qNo').onclick = () => answer(false);
   el.querySelector('#qYes').onclick = () => answer(true);
 }
@@ -668,7 +773,7 @@ const bookName = () => (S.profile.name ? S.profile.name + ' 的' : '') + '單字
 function exportCSV() {
   const q = v => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const rows = live().sort((a, b) => (a.stars || 0) - (b.stars || 0) || a.w.localeCompare(b.w));
-  const csv = '﻿' + [['單字', '發音', '中文意思', '分類', '熟悉度（星）', '備註', '加入日期'], ...rows.map(w => [w.w, w.ipa, w.meaning, w.kind, w.stars || 0, w.note, w.createdAt ? new Date(w.createdAt).toLocaleDateString('zh-TW') : ''])].map(r => r.map(q).join(',')).join('\r\n');
+  const csv = '﻿' + [['單字', '重音', '音標', '中文意思', '分類', '熟悉度（星）', '備註', '加入日期'], ...rows.map(w => [w.w, stressOf(w), w.ipa, w.meaning, w.kind, w.stars || 0, w.note, w.createdAt ? new Date(w.createdAt).toLocaleDateString('zh-TW') : ''])].map(r => r.map(q).join(',')).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = `wordbook${slug ? '-' + slug : ''}-${today()}.csv`;
   document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1500); setTimeout(() => URL.revokeObjectURL(a.href), 1500); toast('已匯出');
 }
@@ -712,7 +817,9 @@ function openSheet(w) {
     <form id="wf" autocomplete="off">
       <div class="field"><label for="ww">單字</label><input id="ww" type="text" value="${esc(cur.w)}" autocapitalize="off" autocorrect="off" spellcheck="false" required></div>
       <div class="field"><label for="wi">發音 / 重音</label><div style="display:flex;gap:6px"><input id="wi" type="text" value="${esc(cur.ipa)}" placeholder="打完單字會自動查詢，例：/ɪnˈvaɪrənmənt/" autocapitalize="off" spellcheck="false" style="font-family:'Lucida Sans Unicode','Arial Unicode MS','Segoe UI',sans-serif"><button class="spk sm" type="button" id="wSay" aria-label="播放發音" style="width:40px;height:40px">${SPK}</button></div>
-        <span class="hint">ˈ 後面的音節是重音；也可以自己寫，例：en-VI-ron-ment</span></div>
+        <span class="hint">音標會自動查詢，ˈ 後面的音節是重音。</span></div>
+      <div class="field"><label for="wst">重音標記</label><input id="wst" type="text" value="${esc(cur.stress || stressNotation(cur.w || '', cur.ipa))}" placeholder="例：en-VI-ron-ment（重音音節大寫）" autocapitalize="off" spellcheck="false">
+        <span class="hint">用 - 分音節，重音音節用大寫。查不到時可以自己寫。</span></div>
       <div class="field"><label for="wm">中文意思</label><input id="wm" type="text" value="${esc(cur.meaning)}"></div>
       <div class="field"><label for="wn">備註</label><input id="wn" type="text" value="${esc(cur.note)}" placeholder="${NOTE_PH[cur.kind] || '例句、提醒…'}"></div>
       <div class="field"><label for="wk">分類</label><select id="wk">${KINDS.map(k => `<option ${k === cur.kind ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
@@ -732,11 +839,14 @@ function openSheet(w) {
     if (wwIn.value.trim() !== word) return;
     wiIn.placeholder = p?.ipa ? '' : '查不到，可以自己寫，例：en-VI-ron-ment';
     if (p?.ipa && (!wiIn.value.trim() || wiIn.dataset.auto)) { wiIn.value = p.ipa; wiIn.dataset.auto = '1'; }
+    const stIn = m.querySelector('#wst');
+    if (stIn && (!stIn.value.trim() || stIn.dataset.auto)) { stIn.value = stressNotation(word, wiIn.value); stIn.dataset.auto = '1'; }
     cur.audio = p?.audio || ''; cur.pronChecked = true;
   };
   wwIn.addEventListener('blur', autoPron);
   wwIn.addEventListener('input', () => { clearTimeout(wwIn._t); wwIn._t = setTimeout(autoPron, 900); });
-  wiIn.addEventListener('input', () => { delete wiIn.dataset.auto; });
+  wiIn.addEventListener('input', () => { delete wiIn.dataset.auto; const stIn = m.querySelector('#wst'); if (stIn.dataset.auto || !stIn.value.trim()) { stIn.value = stressNotation(wwIn.value.trim(), wiIn.value); stIn.dataset.auto = '1'; } });
+  m.querySelector('#wst').addEventListener('input', e => { delete e.target.dataset.auto; });
   m.querySelector('#wSay').onclick = () => speak({ w: wwIn.value.trim(), audio: wwIn.value.trim() === looked || wwIn.value.trim() === cur.w ? cur.audio : '' });
   const ws = m.querySelector('#ws');
   ws.addEventListener('click', e => {
@@ -750,7 +860,7 @@ function openSheet(w) {
     if (!word) { m.querySelector('#ww').focus(); return; }
     const now = Date.now();
     if (word !== cur.w && word !== looked) { cur.audio = ''; cur.pronChecked = false; }
-    const rec = { ...cur, id: cur.id || uid(), w: word, ipa: m.querySelector('#wi').value.trim(), meaning: m.querySelector('#wm').value.trim(), note: m.querySelector('#wn').value.trim(), createdAt: cur.createdAt || now, updatedAt: now };
+    const rec = { ...cur, id: cur.id || uid(), w: word, ipa: m.querySelector('#wi').value.trim(), stress: (v => STRESS_RE.test(v) ? v : '')(m.querySelector('#wst').value.trim().replace(/[·.\s]+/g, '-')), meaning: m.querySelector('#wm').value.trim(), note: m.querySelector('#wn').value.trim(), createdAt: cur.createdAt || now, updatedAt: now };
     const i = S.words.findIndex(x => x.id === rec.id);
     if (i >= 0) S.words[i] = rec; else S.words.push(rec);
     render(); changed();
@@ -774,6 +884,10 @@ $('#settingsBtn').onclick = () => {
     <div class="field"><label for="sn">名字</label><input id="sn" type="text" value="${esc(S.profile.name)}"></div>
     <button class="btn" id="snBtn" type="button">儲存名字</button>
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+    <div class="field"><label for="vSel">發音聲音（這台裝置）</label>
+      <div style="display:flex;gap:6px"><select id="vSel"></select><button class="spk sm" type="button" id="vTest" aria-label="試聽" style="width:40px;height:40px">${SPK}</button></div>
+      <span class="hint">有真人錄音的單字會先播錄音。聲音不自然的話，換一個試試；Mac / iPhone 可以在系統設定下載「Premium / 加強版」英文語音，聽起來更自然。</span></div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
     <div class="field"><label>更改密碼</label><input id="cp1" type="password" placeholder="新密碼" autocomplete="new-password"><input id="cp2" type="password" placeholder="再輸入一次" autocomplete="new-password" style="margin-top:6px"></div>
     <div class="err" id="cpErr"></div>
     <button class="btn" id="cpBtn" type="button">更改密碼</button>
@@ -783,6 +897,11 @@ $('#settingsBtn').onclick = () => {
     <button class="btn" id="ntBtn" type="button">更新</button>
     <div class="row"><button class="btn danger" id="outBtn" type="button">在這台裝置登出</button><button class="btn pri" id="sClose" type="button">關閉</button></div>`);
   m.querySelector('#sClose').onclick = close;
+  const vSel = m.querySelector('#vSel');
+  const fillVoices = () => { const vs = 'speechSynthesis' in window ? goodVoices() : []; vSel.innerHTML = vs.length ? vs.map(v => `<option value="${esc(v.voiceURI)}" ${VOICE && v.voiceURI === VOICE.voiceURI ? 'selected' : ''}>${esc(v.name)}（${esc(v.lang)}）</option>`).join('') : '<option>這台裝置沒有英文語音</option>'; };
+  fillVoices(); if ('speechSynthesis' in window && !speechSynthesis.getVoices().length) setTimeout(fillVoices, 500);
+  vSel.onchange = () => { try { localStorage.setItem(LS_VOICE, vSel.value); } catch {} VOICE = pickVoice(); tts('environment'); };
+  m.querySelector('#vTest').onclick = () => tts('environment');
   m.querySelector('#snBtn').onclick = () => { S.profile = { ...S.profile, name: m.querySelector('#sn').value.trim(), updatedAt: Date.now() }; render(); changed(); toast('已儲存'); };
   m.querySelector('#cpBtn').onclick = async () => {
     const a = m.querySelector('#cp1').value, b = m.querySelector('#cp2').value, er = m.querySelector('#cpErr');
