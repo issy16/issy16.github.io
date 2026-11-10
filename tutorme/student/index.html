@@ -120,9 +120,10 @@ textarea{min-height:60px;resize:vertical}
       </div>
       <div class="field hidden" id="tokWrap">
         <label for="tok">連線碼（老師輸入）</label>
-        <input id="tok" type="password" autocomplete="off" placeholder="github_pat_…">
-        <span class="hint">每台裝置只需輸入一次。</span>
+        <input id="tok" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="github_pat_…">
+        <span class="hint">或請老師在 TutorMe「設定 → 學生連線 QR」顯示 QR code，用這台裝置的相機掃描。</span>
       </div>
+      <div class="hint hidden" id="qrOk" style="color:var(--ok);font-weight:600;margin-bottom:10px">✓ 已透過 QR code 連線</div>
       <div class="err" id="lockErr"></div>
       <button class="btn pri" id="lockBtn" type="submit" style="width:100%">開啟</button>
     </form>
@@ -157,6 +158,10 @@ const DATA_PATH = slug ? `data/student-${slug}.enc.json` : 'data/student.enc.jso
 const ITER = 310000, IDLE_LOCK_MS = 30 * 60 * 1000;
 const LS_TOKEN = 'tutorme.student.token.v1' + (slug ? '.' + slug : '');
 const LS_LOCAL = 'tutorme.student.local.v1' + (slug ? '.' + slug : '');
+// token handed over by the teacher's QR code (#k=...). Fragments never reach the server; remove it from the address bar right away.
+let PENDING = null;
+try { const k = new URLSearchParams(location.hash.slice(1)).get('k'); if (k) PENDING = k; } catch {}
+if (location.hash) history.replaceState(null, '', location.pathname + location.search);
 
 const KIND_ICONS = {
   '聽不出來': '<path d="M6 8.5a6 6 0 1 1 12 0c0 3-2 4.2-3 5.2-.9.9-1 2-1 3.3a3 3 0 0 1-5.6 1.5"/><path d="M9 8.5a3 3 0 0 1 6 0"/>',
@@ -265,11 +270,12 @@ function showLock(msg) {
   Object.assign(S, { password: null, token: null, dataKey: null, dataSalt: null, words: [], profile: {} });
   $('#app').classList.add('hidden'); $('#lock').classList.remove('hidden'); $('#modalRoot').innerHTML = '';
   ['#pw', '#pw2', '#tok', '#nm'].forEach(s => $(s).value = '');
-  const known = !!ls.get(LS_TOKEN);
+  const known = !!ls.get(LS_TOKEN) || !!PENDING;
+  $('#qrOk').classList.toggle('hidden', !PENDING);
   $('#tokWrap').classList.toggle('hidden', known);
   $('#pw2Wrap').classList.add('hidden'); $('#nameWrap').classList.add('hidden'); mode = 'unlock';
   $('#lockTitle').textContent = '我的單字本';
-  $('#lockSub').textContent = known ? '輸入密碼以開啟。' : '這台裝置第一次使用：輸入密碼，並請老師輸入連線碼。';
+  $('#lockSub').textContent = PENDING && !ls.get(LS_TOKEN) ? '輸入你的密碼。第一次使用會請你設定新密碼。' : known ? '輸入密碼以開啟。' : '這台裝置第一次使用：請老師讓你掃描連線 QR code。';
   $('#lockBtn').textContent = '開啟'; $('#lockErr').textContent = msg || '';
   setTimeout(() => $('#pw').focus(), 0);
 }
@@ -280,12 +286,13 @@ $('#lockForm').addEventListener('submit', async ev => {
   err.textContent = ''; btn.disabled = true; btn.textContent = '開啟中…';
   try {
     let token; const stored = ls.get(LS_TOKEN);
-    if (stored) { const b = JSON.parse(stored); try { token = (await unseal(await deriveKey(pw, unb64(b.salt)), b)).token; } catch { throw new Error('密碼錯誤'); } }
+    if (PENDING) token = PENDING;
+    else if (stored) { const b = JSON.parse(stored); try { token = (await unseal(await deriveKey(pw, unb64(b.salt)), b)).token; } catch { throw new Error('密碼錯誤'); } }
     else { token = $('#tok').value.trim(); if (!token) throw new Error('請老師輸入連線碼'); }
     S.token = token;
     let remote;
     try { remote = await ghGet(); }
-    catch (e) { if (e.message === 'TOKEN') { if (stored) ls.del(LS_TOKEN); $('#tokWrap').classList.remove('hidden'); throw new Error('連線碼無效，請老師重新輸入'); } remote = undefined; }
+    catch (e) { if (e.message === 'TOKEN') { if (stored && !PENDING) ls.del(LS_TOKEN); PENDING = null; $('#qrOk').classList.add('hidden'); $('#tokWrap').classList.remove('hidden'); throw new Error('連線碼無效，請老師重新產生 QR code'); } remote = undefined; }
 
     if (remote === null) {
       if (mode !== 'setup') {
@@ -311,7 +318,7 @@ $('#lockForm').addEventListener('submit', async ev => {
       let d; try { d = await unseal(S.dataKey, b); } catch { throw new Error('密碼錯誤'); }
       S.words = d.words || []; S.profile = d.profile || {}; S.dirty = !!d.dirty;
     }
-    if (!stored) { const salt = crypto.getRandomValues(new Uint8Array(16)); ls.set(LS_TOKEN, JSON.stringify(await seal(await deriveKey(pw, salt), salt, { token }))); }
+    if (!stored || PENDING) { PENDING = null; const salt = crypto.getRandomValues(new Uint8Array(16)); ls.set(LS_TOKEN, JSON.stringify(await seal(await deriveKey(pw, salt), salt, { token }))); }
     S.password = pw;
     $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
     render();
@@ -455,7 +462,7 @@ $('#settingsBtn').onclick = () => {
     <button class="btn" id="cpBtn" type="button">更改密碼</button>
     <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
     <div class="field"><label>備份</label><button class="btn" id="exBtn" type="button" style="align-self:flex-start">匯出單字（CSV）</button></div>
-    <div class="field"><label for="nt">更新連線碼（老師）</label><input id="nt" type="password" placeholder="github_pat_…"></div>
+    <div class="field"><label for="nt">更新連線碼（老師）</label><input id="nt" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="github_pat_…"></div>
     <button class="btn" id="ntBtn" type="button">更新</button>
     <div class="row"><button class="btn danger" id="outBtn" type="button">在這台裝置登出</button><button class="btn pri" id="sClose" type="button">關閉</button></div>`);
   m.querySelector('#sClose').onclick = close;

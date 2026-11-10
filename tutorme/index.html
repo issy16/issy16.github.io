@@ -159,7 +159,7 @@ textarea{min-height:64px;resize:vertical;line-height:1.45}
       </div>
       <div class="field hidden" id="tokWrap">
         <label for="tok">GitHub token</label>
-        <input id="tok" type="password" autocomplete="off" placeholder="github_pat_…">
+        <input id="tok" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="github_pat_…">
         <span class="hint">每台裝置只需輸入一次，會用你的密碼加密後存在這台裝置。</span>
       </div>
       <div class="err" id="lockErr"></div>
@@ -874,6 +874,37 @@ function showWordSummary() {
   m.querySelector('#wCopy').onclick = async () => { try { await navigator.clipboard.writeText(text); toast('已複製'); } catch { toast('無法自動複製'); } };
 }
 
+/* ---------------- student QR ---------------- */
+function loadQRLib() {
+  if (window.QRCode) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload = res; s.onerror = () => rej(new Error('QR 產生器載入失敗，請檢查網路'));
+    document.head.appendChild(s);
+  });
+}
+async function showStudentQR(slugIn) {
+  const s = String(slugIn || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 30);
+  const base = new URL('student/' + (s ? '?s=' + s : ''), location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, ''));
+  const link = base.href + '#k=' + encodeURIComponent(S.token);
+  const m = modal(`<h2>學生連線 QR</h2>
+    <p style="margin:0 0 10px;font-size:13px;color:var(--mute)">請學生用手機相機掃描，打開後設定自己的密碼即可。</p>
+    <div id="qrBox" style="display:flex;justify-content:center;padding:12px;background:#fff;border:1px solid var(--line);border-radius:8px;min-height:240px;align-items:center">載入中…</div>
+    <p style="font-size:12px;color:var(--mute);margin:8px 0 0">QR code 裡含有 token，不要拍照或傳到群組。掃完就關閉這個視窗。<br>網址：${esc(base.href)}</p>
+    <div style="display:flex;justify-content:space-between;gap:8px;margin-top:12px">
+      <button class="btn" id="qrCopy" type="button">複製連結</button>
+      <button class="btn pri" id="qrClose" type="button">關閉</button>
+    </div>`);
+  m.querySelector('#qrClose').onclick = close;
+  m.querySelector('#qrCopy').onclick = async () => { try { await navigator.clipboard.writeText(link); toast('已複製（含 token，請小心傳送）'); } catch { toast('無法自動複製'); } };
+  try {
+    await loadQRLib();
+    const box = m.querySelector('#qrBox'); if (!box) return; box.textContent = '';
+    new QRCode(box, { text: link, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M });
+  } catch (e) { const box = m.querySelector('#qrBox'); if (box) box.textContent = e.message; }
+}
+
 /* ---------------- settings ---------------- */
 function modal(html) {
   $('#modalRoot').innerHTML = `<div class="modal" id="mdl"><div class="card">${html}</div></div>`;
@@ -901,8 +932,13 @@ $('#settingsBtn').onclick = () => {
     <div class="err" id="cpErr"></div>
     <button class="btn" id="cpBtn" type="button">更改密碼</button>
     <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+    <h2 style="font-size:15px">學生連線 QR</h2>
+    <div class="field"><label for="qrSlug">學生代號（選填）</label><input id="qrSlug" type="text" placeholder="留空 = /tutorme/student/；例：amy" autocapitalize="off" spellcheck="false">
+      <span class="hint">讓學生用手機相機掃描，就不用在學生裝置輸入 token。</span></div>
+    <button class="btn" id="qrBtn" type="button">顯示 QR code</button>
+    <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
     <h2 style="font-size:15px">GitHub token</h2>
-    <div class="field"><label for="nt">換一個 token</label><input id="nt" type="password" placeholder="github_pat_…"></div>
+    <div class="field"><label for="nt">換一個 token</label><input id="nt" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="github_pat_…"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" id="ntBtn" type="button">更新 token</button>
       <button class="btn danger" id="forgetBtn" type="button">在這台裝置登出</button>
@@ -943,6 +979,7 @@ $('#settingsBtn').onclick = () => {
       await saveLocal(); close(); toast('密碼已更改'); setStatus('ok', '已同步');
     } catch (e) { er.textContent = e.message === 'TOKEN' ? 'GitHub token 沒有寫入權限' : (e.message || '失敗'); }
   };
+  m.querySelector('#qrBtn').onclick = () => showStudentQR(m.querySelector('#qrSlug').value);
   m.querySelector('#ntBtn').onclick = async () => {
     const t = m.querySelector('#nt').value.trim(); if (!t) return;
     const old = S.token; S.token = t;
