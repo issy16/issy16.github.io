@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>TutorMe 單字本</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --main:#2b5c8a; --main-soft:#e8eff6; --ink:#1d2430; --mute:#5b6472; --opt:#3a4350;
+  --line:#c9d1db; --rule:#8a93a0; --panel:#f4f6f9; --bg:#ffffff; --ok:#2f7d4f; --bad:#b42318; --star:#e0a100;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,'Noto Sans TC','PingFang TC','Noto Sans CJK TC','Microsoft JhengHei',sans-serif;font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+.hidden{display:none !important}
+.wrap{max-width:760px;margin:0 auto;padding:20px 16px 80px}
+
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding-bottom:10px;border-bottom:2px solid var(--main);margin-bottom:16px}
+.kick{font-size:12px;font-weight:600;color:var(--main);letter-spacing:.04em}
+h1{margin:2px 0 0;font-size:24px;line-height:1.2}
+.status{font-size:12px;color:var(--mute);display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--rule)}
+.dot.ok{background:var(--ok)} .dot.busy{background:var(--main)} .dot.err{background:var(--bad)}
+.tools{display:flex;gap:4px;justify-content:flex-end}
+
+.btn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:600;font-size:14px}
+.btn:hover{border-color:var(--main)}
+.btn.pri{background:var(--main);border-color:var(--main);color:#fff}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--mute);padding:6px 8px;font-size:13px}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:default}
+
+.lock{max-width:380px;margin:10vh auto 0;padding:0 16px}
+.lock .card{border:1px solid var(--line);border-radius:8px;padding:22px}
+.lock h1{font-size:22px;margin-bottom:4px}
+.lock p{color:var(--mute);font-size:14px;margin:0 0 16px}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.field label{font-size:14px;font-weight:600}
+.hint{font-size:12px;color:var(--mute)}
+input[type=text],input[type=password],select,textarea{width:100%;border:1px solid var(--line);border-radius:6px;padding:9px 10px;background:#fff;outline:none;font-size:16px}
+input:focus,select:focus,textarea:focus{border-color:var(--main);box-shadow:0 0 0 3px var(--main-soft)}
+textarea{min-height:60px;resize:vertical}
+.err{color:var(--bad);font-size:14px;min-height:18px;margin-bottom:8px}
+
+/* summary */
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:18px}
+.stats>div{border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center}
+.stats .k{font-size:12px;color:var(--mute)}
+.stats .v{font-size:20px;font-weight:700}
+
+/* section */
+.sec{display:flex;align-items:center;gap:8px;margin:18px 0 10px}
+.sq{display:inline-flex;width:20px;height:20px;border-radius:4px;background:var(--main);color:#fff;font-size:12px;font-weight:700;align-items:center;justify-content:center}
+.sec h2{margin:0;font-size:16px}
+
+/* kind cards */
+.kinds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.kcard{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid transparent;border-radius:8px;padding:14px 16px;cursor:pointer;font-weight:700;font-size:15px;text-align:left;color:var(--ink)}
+.kcard:hover{border-color:var(--main)}
+.kcard svg{width:20px;height:20px;flex:none;color:var(--opt)}
+
+/* filters */
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+.chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.chip small{opacity:.7;margin-left:3px}
+.tools2{display:grid;grid-template-columns:1fr 150px;gap:8px;margin-bottom:12px}
+
+/* word list */
+.word{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start}
+.word .main{flex:1;min-width:0;cursor:pointer}
+.word .w{font-size:17px;font-weight:700;word-break:break-word}
+.word .m{color:var(--opt);font-size:14px}
+.word .n{color:var(--mute);font-size:13px;margin-top:2px}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;border-radius:4px;padding:1px 7px;background:var(--main-soft);color:var(--main);margin-left:6px;vertical-align:2px}
+.tag svg{width:12px;height:12px}
+.empty{color:var(--mute);text-align:center;padding:36px 12px;border:1px dashed var(--line);border-radius:8px}
+
+/* stars */
+.stars{display:flex;gap:0;flex:none}
+.stars button{border:0;background:none;padding:2px;cursor:pointer;line-height:0;color:#d5dae1}
+.stars button.on{color:var(--star)}
+.stars svg{width:22px;height:22px}
+.stars.big svg{width:32px;height:32px}
+.stars button:focus-visible{outline:2px solid var(--main);border-radius:4px}
+
+/* sheet */
+.modal{position:fixed;inset:0;background:rgba(29,36,48,.45);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+.modal .card{background:#fff;border-radius:12px 12px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));width:100%;max-width:520px;max-height:92vh;overflow:auto}
+@media (min-width:640px){.modal{align-items:center}.modal .card{border-radius:10px}}
+.modal h2{margin:0 0 14px;font-size:18px;display:flex;align-items:center;gap:8px}
+.modal h2 svg{width:20px;height:20px;color:var(--opt)}
+.row{display:flex;justify-content:space-between;gap:8px;margin-top:16px}
+.demo{background:#fff6e0;border:1px solid #f0d58a;color:#6b4d00;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}.demo a{color:var(--main);font-weight:700;text-decoration:none}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:6px;font-size:14px;z-index:20}
+</style>
+</head>
+<body>
+
+<div id="lock" class="lock">
+  <div class="card">
+    <div class="kick">TutorMe · 單字本</div>
+    <h1 id="lockTitle">我的單字本</h1>
+    <p id="lockSub">輸入密碼以開啟。</p>
+    <form id="lockForm" autocomplete="off">
+      <div class="field hidden" id="nameWrap">
+        <label for="nm">你的名字</label>
+        <input id="nm" type="text" autocomplete="off" placeholder="例：Amy">
+      </div>
+      <div class="field">
+        <label for="pw">密碼</label>
+        <input id="pw" type="password" autocomplete="current-password" required>
+      </div>
+      <div class="field hidden" id="pw2Wrap">
+        <label for="pw2">再輸入一次密碼</label>
+        <input id="pw2" type="password" autocomplete="new-password">
+        <span class="hint">密碼無法找回，忘記就打不開。請記好，也可以告訴老師。</span>
+      </div>
+      <div class="field hidden" id="tokWrap">
+        <label for="tok">連線碼（老師輸入）</label>
+        <input id="tok" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="github_pat_…">
+        <span class="hint">或請老師在 TutorMe「設定 → 學生連線 QR」顯示 QR code，用這台裝置的相機掃描。</span>
+      </div>
+      <div class="hint hidden" id="qrOk" style="color:var(--ok);font-weight:600;margin-bottom:10px">✓ 已透過 QR code 連線</div>
+      <div class="err" id="lockErr"></div>
+      <button class="btn pri" id="lockBtn" type="submit" style="width:100%">開啟</button>
+    </form>
+  </div>
+</div>
+
+<div id="app" class="wrap hidden">
+  <header class="top">
+    <div>
+      <div class="kick">TutorMe · 單字本</div>
+      <h1 id="title">我的單字本</h1>
+    </div>
+    <div>
+      <div class="status"><span class="dot" id="syncDot"></span><span id="syncText">—</span></div>
+      <div class="tools">
+        <button class="btn ghost" id="settingsBtn" type="button">設定</button>
+        <button class="btn ghost" id="lockNowBtn" type="button">鎖定</button>
+      </div>
+    </div>
+  </header>
+  <main id="view"></main>
+</div>
+<div id="modalRoot"></div>
+
+<script>
+(() => {
+'use strict';
+
+const OWNER = 'issy16', REPO = 'tutorme', BRANCH = 'main';
+const slug = (new URLSearchParams(location.search).get('s') || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 30);
+const DATA_PATH = slug ? `data/student-${slug}.enc.json` : 'data/student.enc.json';
+const ITER = 310000, IDLE_LOCK_MS = 30 * 60 * 1000;
+const LS_TOKEN = 'tutorme.student.token.v1' + (slug ? '.' + slug : '');
+const LS_LOCAL = 'tutorme.student.local.v1' + (slug ? '.' + slug : '');
+const DEMO = /\/guest(\/|$)/.test(location.pathname);
+// token handed over by the teacher's QR code (#k=...). Fragments never reach the server; remove it from the address bar right away.
+let PENDING = null;
+try { const k = new URLSearchParams(location.hash.slice(1)).get('k'); if (k) PENDING = k; } catch {}
+if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+
+const KIND_ICONS = {
+  '聽不出來': '<path d="M6 8.5a6 6 0 1 1 12 0c0 3-2 4.2-3 5.2-.9.9-1 2-1 3.3a3 3 0 0 1-5.6 1.5"/><path d="M9 8.5a3 3 0 0 1 6 0"/>',
+  '拼錯': '<path d="M4 20l4-1 11-11-3-3L5 16l-1 4z"/><path d="M14 6l3 3"/>',
+  '不會的字': '<path d="M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3z"/><path d="M21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z"/>',
+  '新學的字': '<path d="M11 3l1.8 5.2L18 10l-5.2 1.8L11 17l-1.8-5.2L4 10l5.2-1.8z"/><path d="M19 14l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',
+  '難記的字': '<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 3 3 2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><path d="M15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-3 3 2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>',
+  '認得但不會用': '<path d="M12 21a9 9 0 1 0-8-4.9L3 21l4.9-1A9 9 0 0 0 12 21z"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5"/><path d="M12 16.5h.01"/>',
+  '容易混淆': '<path d="M4 8h15l-3-3"/><path d="M20 16H5l3 3"/>',
+  '忘記的字': '<path d="M20 12a8 8 0 1 1-2.3-5.7L20 8"/><path d="M20 4v4h-4"/>',
+};
+const KINDS = Object.keys(KIND_ICONS);
+const icon = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${KIND_ICONS[k] || ''}</svg>`;
+const STAR = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z"/></svg>';
+const NOTE_PH = { '拼錯': '我寫成…', '容易混淆': '和哪個字搞混…', '聽不出來': '我聽成…', '認得但不會用': '例句…' };
+
+const S = { password: null, token: null, dataSalt: null, dataKey: null, remoteSha: null,
+  words: [], profile: {}, dirty: false, syncing: false, again: false,
+  filter: { kind: '', q: '', sort: 'weak' } };
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const enc = new TextEncoder(), dec = new TextDecoder();
+const b64 = buf => { let s=''; const a=new Uint8Array(buf); for (let i=0;i<a.length;i+=0x8000) s+=String.fromCharCode.apply(null,a.subarray(i,i+0x8000)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const ls = { get(k){ try { return localStorage.getItem(k); } catch { return null; } }, set(k,v){ try { localStorage.setItem(k,v); } catch {} }, del(k){ try { localStorage.removeItem(k); } catch {} } };
+function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(),2000); }
+
+/* crypto */
+async function deriveKey(pw, salt) {
+  const base = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: ITER }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function seal(key, salt, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(obj)));
+  return { v: 1, kdf: 'PBKDF2-SHA256', iter: ITER, salt: b64(salt), iv: b64(iv), ct: b64(ct) };
+}
+async function unseal(key, blob) {
+  return JSON.parse(dec.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(blob.iv) }, key, unb64(blob.ct))));
+}
+
+/* github */
+const API = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${DATA_PATH}`;
+const H = () => ({ 'Accept': 'application/vnd.github+json', 'Authorization': `Bearer ${S.token}`, 'X-GitHub-Api-Version': '2022-11-28' });
+async function ghGet() {
+  const r = await fetch(`${API}?ref=${BRANCH}&t=${Date.now()}`, { headers: H(), cache: 'no-store' });
+  if (r.status === 404) {
+    const rr = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}`, { headers: H(), cache: 'no-store' });
+    if (!rr.ok) throw new Error('TOKEN');
+    return null;
+  }
+  if (r.status === 401 || r.status === 403) throw new Error('TOKEN');
+  if (!r.ok) throw new Error('NET');
+  const j = await r.json();
+  const text = j.content ? atob(j.content.replace(/\n/g, '')) : await (await fetch(j.git_url, { headers: { ...H(), Accept: 'application/vnd.github.raw' } })).text();
+  return { sha: j.sha, blob: JSON.parse(text) };
+}
+async function ghPut(blob, sha) {
+  const body = { message: `student words ${new Date().toISOString()}`, content: btoa(JSON.stringify(blob)), branch: BRANCH };
+  if (sha) body.sha = sha;
+  const r = await fetch(API, { method: 'PUT', headers: { ...H(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (r.status === 409 || r.status === 422) return { conflict: true };
+  if (!r.ok) throw new Error(r.status === 401 || r.status === 403 || r.status === 404 ? 'TOKEN' : 'NET');
+  return { sha: (await r.json()).content.sha };
+}
+
+/* data */
+const merge = (a, b) => { const m = new Map(); for (const e of [...a, ...b]) { const c = m.get(e.id); if (!c || (e.updatedAt || 0) > (c.updatedAt || 0)) m.set(e.id, e); } return [...m.values()]; };
+const mergeProfile = (a = {}, b = {}) => ((b.updatedAt || 0) > (a.updatedAt || 0) ? b : a);
+const payload = () => ({ words: S.words, profile: S.profile });
+async function saveLocal() { if (DEMO) return; if (S.dataKey) ls.set(LS_LOCAL, JSON.stringify(await seal(S.dataKey, S.dataSalt, { ...payload(), dirty: S.dirty }))); }
+async function adopt(blob) {
+  if (blob.salt === b64(S.dataSalt)) return unseal(S.dataKey, blob);
+  const salt = unb64(blob.salt), key = await deriveKey(S.password, salt);
+  let d; try { d = await unseal(key, blob); } catch { throw new Error('SALT'); }
+  S.dataSalt = salt; S.dataKey = key; return d;
+}
+function setStatus(k, t) { $('#syncDot').className = 'dot ' + (k || ''); $('#syncText').textContent = t; }
+async function sync() {
+  if (DEMO) { S.dirty = false; setStatus('ok', '示範模式：不會儲存'); return; }
+  if (S.syncing) { S.again = true; return; }
+  S.syncing = true; setStatus('busy', '同步中…');
+  try {
+    for (let i = 0; i < 4; i++) {
+      const remote = await ghGet();
+      if (remote) { const r = await adopt(remote.blob); S.words = merge(S.words, r.words || []); S.profile = mergeProfile(S.profile, r.profile); S.remoteSha = remote.sha; }
+      else S.remoteSha = null;
+      const res = await ghPut(await seal(S.dataKey, S.dataSalt, payload()), S.remoteSha);
+      if (res.conflict) continue;
+      S.remoteSha = res.sha; S.dirty = false; await saveLocal();
+      setStatus('ok', '已儲存 ' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }));
+      render(); break;
+    }
+  } catch (e) {
+    S.dirty = true; await saveLocal();
+    setStatus('err', e.message === 'TOKEN' ? '連線碼失效，請老師到「設定」更新' : e.message === 'SALT' ? '密碼已在其他裝置更改，請重新鎖定' : '先存在這台裝置，稍後再同步');
+  } finally { S.syncing = false; if (S.again) { S.again = false; sync(); } }
+}
+let syncT;
+async function changed() { S.dirty = true; await saveLocal(); setStatus('busy', '儲存中…'); clearTimeout(syncT); syncT = setTimeout(sync, 1200); }
+
+/* lock */
+let mode = 'unlock';
+function showLock(msg) {
+  Object.assign(S, { password: null, token: null, dataKey: null, dataSalt: null, words: [], profile: {} });
+  $('#app').classList.add('hidden'); $('#lock').classList.remove('hidden'); $('#modalRoot').innerHTML = '';
+  ['#pw', '#pw2', '#tok', '#nm'].forEach(s => $(s).value = '');
+  const known = !!ls.get(LS_TOKEN) || !!PENDING;
+  $('#qrOk').classList.toggle('hidden', !PENDING);
+  $('#tokWrap').classList.toggle('hidden', known);
+  $('#pw2Wrap').classList.add('hidden'); $('#nameWrap').classList.add('hidden'); mode = 'unlock';
+  $('#lockTitle').textContent = '我的單字本';
+  $('#lockSub').textContent = PENDING && !ls.get(LS_TOKEN) ? '輸入你的密碼。第一次使用會請你設定新密碼。' : known ? '輸入密碼以開啟。' : '這台裝置第一次使用：請老師讓你掃描連線 QR code。';
+  $('#lockBtn').textContent = '開啟'; $('#lockErr').textContent = msg || '';
+  setTimeout(() => $('#pw').focus(), 0);
+}
+$('#lockForm').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const pw = $('#pw').value, err = $('#lockErr'), btn = $('#lockBtn');
+  if (!pw) return;
+  err.textContent = ''; btn.disabled = true; btn.textContent = '開啟中…';
+  try {
+    let token; const stored = ls.get(LS_TOKEN);
+    if (PENDING) token = PENDING;
+    else if (stored) { const b = JSON.parse(stored); try { token = (await unseal(await deriveKey(pw, unb64(b.salt)), b)).token; } catch { throw new Error('密碼錯誤'); } }
+    else { token = $('#tok').value.trim(); if (!token) throw new Error('請老師輸入連線碼'); }
+    S.token = token;
+    let remote;
+    try { remote = await ghGet(); }
+    catch (e) { if (e.message === 'TOKEN') { if (stored && !PENDING) ls.del(LS_TOKEN); PENDING = null; $('#qrOk').classList.add('hidden'); $('#tokWrap').classList.remove('hidden'); throw new Error('連線碼無效，請老師重新產生 QR code'); } remote = undefined; }
+
+    if (remote === null) {
+      if (mode !== 'setup') {
+        mode = 'setup';
+        $('#pw2Wrap').classList.remove('hidden'); $('#nameWrap').classList.remove('hidden');
+        $('#lockTitle').textContent = '建立你的單字本';
+        $('#lockSub').textContent = '設定你自己的密碼，只有知道密碼的人才能打開。';
+        $('#lockBtn').textContent = '建立並開啟'; btn.disabled = false; $('#nm').focus(); return;
+      }
+      if (pw.length < 6) throw new Error('密碼至少 6 個字元');
+      if (pw !== $('#pw2').value) throw new Error('兩次輸入的密碼不一樣');
+      S.dataSalt = crypto.getRandomValues(new Uint8Array(16)); S.dataKey = await deriveKey(pw, S.dataSalt);
+      S.words = []; S.profile = { name: $('#nm').value.trim(), updatedAt: Date.now() }; S.dirty = true;
+    } else if (remote) {
+      S.dataSalt = unb64(remote.blob.salt); S.dataKey = await deriveKey(pw, S.dataSalt);
+      let d; try { d = await unseal(S.dataKey, remote.blob); } catch { throw new Error('密碼錯誤'); }
+      S.words = d.words || []; S.profile = d.profile || {}; S.remoteSha = remote.sha;
+      const raw = ls.get(LS_LOCAL);
+      if (raw) { try { const b = JSON.parse(raw); if (b.salt === remote.blob.salt) { const l = await unseal(S.dataKey, b); if (l.dirty) { S.words = merge(S.words, l.words || []); S.dirty = true; } } } catch {} }
+    } else {
+      const raw = ls.get(LS_LOCAL); if (!raw) throw new Error('無法連線，這台裝置也沒有暫存');
+      const b = JSON.parse(raw); S.dataSalt = unb64(b.salt); S.dataKey = await deriveKey(pw, S.dataSalt);
+      let d; try { d = await unseal(S.dataKey, b); } catch { throw new Error('密碼錯誤'); }
+      S.words = d.words || []; S.profile = d.profile || {}; S.dirty = !!d.dirty;
+    }
+    if (!stored || PENDING) { PENDING = null; const salt = crypto.getRandomValues(new Uint8Array(16)); ls.set(LS_TOKEN, JSON.stringify(await seal(await deriveKey(pw, salt), salt, { token }))); }
+    S.password = pw;
+    $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
+    render();
+    if (remote === undefined) setStatus('err', '離線：顯示這台裝置的暫存');
+    else if (S.dirty) sync(); else { setStatus('ok', '已同步'); saveLocal(); }
+  } catch (e) { err.textContent = e.message || String(e); }
+  finally { btn.disabled = false; btn.textContent = mode === 'setup' ? '建立並開啟' : '開啟'; }
+});
+let idleT;
+const bump = () => { clearTimeout(idleT); idleT = setTimeout(() => { if (S.dataKey && !S.dirty && !DEMO) showLock('閒置太久，已自動鎖定。'); }, IDLE_LOCK_MS); };
+['click', 'keydown', 'touchstart'].forEach(e => document.addEventListener(e, bump, { passive: true }));
+$('#lockNowBtn').onclick = () => showLock();
+
+/* render */
+const live = () => S.words.filter(w => !w.deleted);
+const starsHtml = (n, id, big) => `<div class="stars${big ? ' big' : ''}" role="radiogroup" aria-label="熟悉度">${[1,2,3,4,5].map(i =>
+  `<button type="button" class="${i <= (n || 0) ? 'on' : ''}" data-star="${i}" ${id ? `data-id="${esc(id)}"` : ''} role="radio" aria-checked="${i === n}" aria-label="${i} 顆星">${STAR}</button>`).join('')}</div>`;
+
+function render() {
+  const name = S.profile.name;
+  $('#title').textContent = name ? `${name} 的單字本` : '我的單字本';
+  const all = live(), f = S.filter;
+  const rated = all.filter(w => w.stars);
+  const avg = rated.length ? (rated.reduce((t, w) => t + w.stars, 0) / rated.length).toFixed(1) : '—';
+  const weak = all.filter(w => (w.stars || 0) <= 2).length;
+  let rows = all;
+  if (f.kind === 'weak') rows = rows.filter(w => (w.stars || 0) <= 2);
+  else if (f.kind) rows = rows.filter(w => w.kind === f.kind);
+  if (f.q) { const q = f.q.toLowerCase(); rows = rows.filter(w => [w.w, w.meaning, w.note].join(' ').toLowerCase().includes(q)); }
+  rows = rows.slice().sort(
+    f.sort === 'weak' ? (a, b) => (a.stars || 0) - (b.stars || 0) || b.createdAt - a.createdAt :
+    f.sort === 'new' ? (a, b) => b.createdAt - a.createdAt :
+    (a, b) => a.w.localeCompare(b.w, 'en', { sensitivity: 'base' }));
+  const count = k => all.filter(w => w.kind === k).length;
+
+  $('#view').innerHTML = `
+    <div class="stats">
+      <div><div class="k">單字</div><div class="v">${all.length}</div></div>
+      <div><div class="k">平均熟悉度</div><div class="v">${avg}${avg !== '—' ? '<span style="color:var(--star);font-size:16px"> ★</span>' : ''}</div></div>
+      <div><div class="k">待加強（≤2★）</div><div class="v">${weak}</div></div>
+    </div>
+    <div class="sec"><span class="sq">1</span><h2>新增單字</h2></div>
+    <div class="kinds">${KINDS.map(k => `<button class="kcard" type="button" data-add="${k}">${icon(k)}${k}</button>`).join('')}</div>
+    <div class="sec"><span class="sq">2</span><h2>我的單字</h2></div>
+    <div class="chips">
+      <button class="chip ${!f.kind ? 'on' : ''}" data-kind="">全部<small>${all.length}</small></button>
+      <button class="chip ${f.kind === 'weak' ? 'on' : ''}" data-kind="weak">待加強<small>${weak}</small></button>
+      ${KINDS.filter(count).map(k => `<button class="chip ${f.kind === k ? 'on' : ''}" data-kind="${k}">${k}<small>${count(k)}</small></button>`).join('')}
+    </div>
+    <div class="tools2">
+      <input type="text" id="q" placeholder="搜尋單字或意思…" value="${esc(f.q)}" aria-label="搜尋">
+      <select id="sort" aria-label="排序">
+        <option value="weak" ${f.sort === 'weak' ? 'selected' : ''}>最不熟的先</option>
+        <option value="new" ${f.sort === 'new' ? 'selected' : ''}>最新加入</option>
+        <option value="az" ${f.sort === 'az' ? 'selected' : ''}>A → Z</option>
+      </select>
+    </div>
+    ${rows.length ? rows.map(w => `<div class="word">
+      <div class="main" data-edit="${esc(w.id)}" role="button" tabindex="0">
+        <div><span class="w">${esc(w.w)}</span><span class="tag">${icon(w.kind)}${esc(w.kind)}</span></div>
+        ${w.meaning ? `<div class="m">${esc(w.meaning)}</div>` : ''}
+        ${w.note ? `<div class="n">${esc(w.note)}</div>` : ''}
+      </div>
+      ${starsHtml(w.stars, w.id)}
+    </div>`).join('') : `<div class="empty">${all.length ? '沒有符合的單字' : '還沒有單字。點上面的分類，新增第一個單字。'}</div>`}
+  `;
+  const v = $('#view');
+  v.querySelectorAll('[data-add]').forEach(b => b.onclick = () => openSheet({ kind: b.dataset.add }));
+  v.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => { f.kind = b.dataset.kind; render(); });
+  v.querySelectorAll('[data-edit]').forEach(el => {
+    el.onclick = () => openSheet(S.words.find(w => w.id === el.dataset.edit));
+    el.onkeydown = e => { if (e.key === 'Enter') el.click(); };
+  });
+  v.querySelectorAll('.stars [data-star]').forEach(b => b.onclick = async () => {
+    const w = S.words.find(x => x.id === b.dataset.id); const n = +b.dataset.star;
+    w.stars = w.stars === n ? n - 1 : n; w.updatedAt = Date.now();
+    render(); changed();
+  });
+  $('#q').oninput = e => { f.q = e.target.value; const p = e.target.selectionStart; render(); const q = $('#q'); q.focus(); q.setSelectionRange(p, p); };
+  $('#sort').onchange = e => { f.sort = e.target.value; render(); };
+}
+
+/* add / edit sheet */
+function modal(html) {
+  $('#modalRoot').innerHTML = `<div class="modal" id="mdl"><div class="card">${html}</div></div>`;
+  $('#mdl').addEventListener('click', e => { if (e.target.id === 'mdl') close(); });
+  return $('#mdl');
+}
+const close = () => { $('#modalRoot').innerHTML = ''; };
+function openSheet(w) {
+  const isNew = !w.id;
+  const cur = { stars: 0, ...w };
+  const m = modal(`<h2>${icon(cur.kind)}${isNew ? '新增：' : ''}${esc(cur.kind)}</h2>
+    <form id="wf" autocomplete="off">
+      <div class="field"><label for="ww">單字</label><input id="ww" type="text" value="${esc(cur.w)}" autocapitalize="off" autocorrect="off" spellcheck="false" required></div>
+      <div class="field"><label for="wm">中文意思</label><input id="wm" type="text" value="${esc(cur.meaning)}"></div>
+      <div class="field"><label for="wn">備註</label><input id="wn" type="text" value="${esc(cur.note)}" placeholder="${NOTE_PH[cur.kind] || '例句、提醒…'}"></div>
+      <div class="field"><label for="wk">分類</label><select id="wk">${KINDS.map(k => `<option ${k === cur.kind ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
+      <div class="field"><label>熟悉度</label><div id="ws">${starsHtml(cur.stars, null, true)}</div></div>
+      <div class="row">
+        <div>${isNew ? '<button class="btn" type="button" id="wCancel">取消</button>' : '<button class="btn danger" type="button" id="wDel">刪除</button>'}</div>
+        <div style="display:flex;gap:8px">${isNew ? '<button class="btn" type="button" id="wMore">儲存並再新增</button>' : ''}<button class="btn pri" type="submit">儲存</button></div>
+      </div>
+    </form>`);
+  const ws = m.querySelector('#ws');
+  ws.addEventListener('click', e => {
+    const b = e.target.closest('[data-star]'); if (!b) return;
+    const n = +b.dataset.star; cur.stars = cur.stars === n ? n - 1 : n;
+    ws.innerHTML = starsHtml(cur.stars, null, true);
+  });
+  m.querySelector('#wk').onchange = e => { cur.kind = e.target.value; m.querySelector('h2').innerHTML = `${icon(cur.kind)}${isNew ? '新增：' : ''}${esc(cur.kind)}`; m.querySelector('#wn').placeholder = NOTE_PH[cur.kind] || '例句、提醒…'; };
+  const save = async (again) => {
+    const word = m.querySelector('#ww').value.trim();
+    if (!word) { m.querySelector('#ww').focus(); return; }
+    const now = Date.now();
+    const rec = { ...cur, id: cur.id || uid(), w: word, meaning: m.querySelector('#wm').value.trim(), note: m.querySelector('#wn').value.trim(), createdAt: cur.createdAt || now, updatedAt: now };
+    const i = S.words.findIndex(x => x.id === rec.id);
+    if (i >= 0) S.words[i] = rec; else S.words.push(rec);
+    render(); changed();
+    if (again) { toast('已新增 ' + word); openSheet({ kind: cur.kind }); } else close();
+  };
+  m.querySelector('#wf').onsubmit = e => { e.preventDefault(); save(false); };
+  m.querySelector('#wMore')?.addEventListener('click', () => save(true));
+  m.querySelector('#wCancel')?.addEventListener('click', close);
+  m.querySelector('#wDel')?.addEventListener('click', () => {
+    if (!confirm(`刪除「${cur.w}」？`)) return;
+    const i = S.words.findIndex(x => x.id === cur.id); S.words[i] = { id: cur.id, deleted: true, updatedAt: Date.now() };
+    close(); render(); changed();
+  });
+  setTimeout(() => m.querySelector(isNew ? '#ww' : '#wm').focus(), 30);
+}
+
+/* settings */
+$('#settingsBtn').onclick = () => {
+  if (DEMO) { const dm = modal(`<h2>示範模式</h2><p style="font-size:14px">這是展示用的版本：資料只存在這個分頁，重新整理就會還原。</p><div style="text-align:right"><button class="btn pri" id="dmClose" type="button">關閉</button></div>`); dm.querySelector('#dmClose').onclick = close; return; }
+  const m = modal(`<h2>設定</h2>
+    <div class="field"><label for="sn">名字</label><input id="sn" type="text" value="${esc(S.profile.name)}"></div>
+    <button class="btn" id="snBtn" type="button">儲存名字</button>
+    <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+    <div class="field"><label>更改密碼</label><input id="cp1" type="password" placeholder="新密碼" autocomplete="new-password"><input id="cp2" type="password" placeholder="再輸入一次" autocomplete="new-password" style="margin-top:6px"></div>
+    <div class="err" id="cpErr"></div>
+    <button class="btn" id="cpBtn" type="button">更改密碼</button>
+    <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+    <div class="field"><label>備份</label><button class="btn" id="exBtn" type="button" style="align-self:flex-start">匯出單字（CSV）</button></div>
+    <div class="field"><label for="nt">更新連線碼（老師）</label><input id="nt" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="github_pat_…"></div>
+    <button class="btn" id="ntBtn" type="button">更新</button>
+    <div class="row"><button class="btn danger" id="outBtn" type="button">在這台裝置登出</button><button class="btn pri" id="sClose" type="button">關閉</button></div>`);
+  m.querySelector('#sClose').onclick = close;
+  m.querySelector('#snBtn').onclick = () => { S.profile = { ...S.profile, name: m.querySelector('#sn').value.trim(), updatedAt: Date.now() }; render(); changed(); toast('已儲存'); };
+  m.querySelector('#cpBtn').onclick = async () => {
+    const a = m.querySelector('#cp1').value, b = m.querySelector('#cp2').value, er = m.querySelector('#cpErr');
+    if (a.length < 6) return er.textContent = '密碼至少 6 個字元';
+    if (a !== b) return er.textContent = '兩次輸入不一樣';
+    try {
+      const remote = await ghGet();
+      if (remote) { const r = await adopt(remote.blob); S.words = merge(S.words, r.words || []); S.remoteSha = remote.sha; }
+      const salt = crypto.getRandomValues(new Uint8Array(16)), key = await deriveKey(a, salt);
+      const res = await ghPut(await seal(key, salt, payload()), S.remoteSha);
+      if (res.conflict) throw new Error('請再試一次');
+      Object.assign(S, { remoteSha: res.sha, dataSalt: salt, dataKey: key, password: a, dirty: false });
+      const ts = crypto.getRandomValues(new Uint8Array(16));
+      ls.set(LS_TOKEN, JSON.stringify(await seal(await deriveKey(a, ts), ts, { token: S.token })));
+      await saveLocal(); close(); toast('密碼已更改');
+    } catch (e) { er.textContent = e.message === 'TOKEN' ? '連線碼沒有權限' : (e.message || '失敗'); }
+  };
+  m.querySelector('#exBtn').onclick = () => {
+    const q = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
+    const csv = '﻿單字,中文意思,分類,熟悉度,備註\n' + live().map(w => [w.w, w.meaning, w.kind, w.stars || 0, w.note].map(q).join(',')).join('\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = '單字本.csv'; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  m.querySelector('#ntBtn').onclick = async () => {
+    const t = m.querySelector('#nt').value.trim(); if (!t) return;
+    const old = S.token; S.token = t;
+    try { await ghGet(); } catch { S.token = old; return toast('這個連線碼無法使用'); }
+    const ts = crypto.getRandomValues(new Uint8Array(16));
+    ls.set(LS_TOKEN, JSON.stringify(await seal(await deriveKey(S.password, ts), ts, { token: t }))); close(); toast('已更新'); sync();
+  };
+  m.querySelector('#outBtn').onclick = () => {
+    if (S.dirty && !confirm('還有沒同步的單字，登出會遺失。確定嗎？')) return;
+    if (!confirm('登出後，這台裝置下次要重新輸入連線碼。確定嗎？')) return;
+    ls.del(LS_TOKEN); ls.del(LS_LOCAL); showLock('已登出。');
+  };
+};
+
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && S.dataKey && !DEMO && !$('#mdl')) {
+    try { const r = await ghGet(); if (r) { const d = await adopt(r.blob); S.words = merge(S.words, d.words || []); S.profile = mergeProfile(S.profile, d.profile); S.remoteSha = r.sha; render(); } } catch {}
+  }
+});
+if (!window.crypto?.subtle) { $('#lockErr').textContent = '這個瀏覽器不支援，請用最新版 Chrome 或 Safari 開啟。'; $('#lockBtn').disabled = true; }
+function startDemo() {
+  const t = Date.now();
+  const W = [['environment','環境','拼錯','我寫成 enviroment',2],['recipe','食譜','聽不出來','我聽成 receipt',3],['affect','影響（動詞）','容易混淆','和 effect 搞混',1],
+    ['renowned','有名的','新學的字','be renowned for',4],['opposition','反對','難記的字','',2],['restrict','限制','認得但不會用','restrict the use of',3],
+    ['vague','含糊的','忘記的字','',1],['debt','債務','聽不出來','b 不發音',5],['opportunity','機會','拼錯','oppor-tu-ni-ty',4],['abandon','放棄','不會的字','',0]];
+  S.words = W.map(([w, meaning, kind, note, stars], i) => ({ id: 'd' + i, w, meaning, kind, note, stars, createdAt: t - i * 3600e3, updatedAt: t }));
+  S.profile = { name: '小安', updatedAt: t }; S.dataKey = 'demo';
+  $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
+  $('#lockNowBtn').classList.add('hidden');
+  const b = document.createElement('div'); b.className = 'demo';
+  b.innerHTML = '<span><b>示範模式</b>・範例資料，重新整理就會還原。</span><a href="../">← 老師版示範</a>';
+  $('#app').insertBefore(b, $('#app').firstChild);
+  document.title = 'TutorMe 單字本示範';
+  render(); setStatus('ok', '示範模式：不會儲存');
+}
+if (DEMO) startDemo(); else showLock();
+})();
+</script>
+</body>
+</html>

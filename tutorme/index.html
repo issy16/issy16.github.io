@@ -124,6 +124,7 @@ textarea{min-height:64px;resize:vertical;line-height:1.45}
 .modal{position:fixed;inset:0;background:rgba(29,36,48,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
 .modal .card{background:#fff;border-radius:8px;padding:20px;max-width:440px;width:100%;max-height:90vh;overflow:auto}
 .modal h2{margin:0 0 12px;font-size:17px}
+.demo{background:#fff6e0;border:1px solid #f0d58a;color:#6b4d00;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}.demo a{color:var(--main);font-weight:700;text-decoration:none}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:6px;font-size:13px;z-index:20}
 
 @media (max-width:640px){
@@ -201,6 +202,7 @@ const ITER = 310000;
 const IDLE_LOCK_MS = 30 * 60 * 1000;
 const LS_TOKEN = 'tutorme.token.v1';
 const LS_LOCAL = 'tutorme.local.v1';
+const DEMO = /\/guest(\/|$)/.test(location.pathname); // /tutorme/guest/: sample data, nothing is saved, no token
 
 /* ---------------- state ---------------- */
 const S = {
@@ -297,6 +299,7 @@ function merge(a, b) {
 
 /* ---------------- local copy ---------------- */
 async function saveLocal() {
+  if (DEMO) return;
   if (!S.dataKey) return;
   const blob = await seal(S.dataKey, S.dataSalt, { entries: S.entries, dirty: S.dirty });
   ls.set(LS_LOCAL, JSON.stringify(blob));
@@ -326,6 +329,7 @@ async function adoptRemote(blob) {
   return data;
 }
 async function sync() {
+  if (DEMO) { S.dirty = false; setStatus('ok', '示範模式：不會儲存'); if (!S.editing) render(); return; }
   if (localOnly()) { S.dirty = false; await saveLocal(); localStatus(); if (!S.editing) render(); return; }
   if (S.syncing) { S.again = true; return; }
   S.syncing = true; setStatus('busy', '同步中…');
@@ -357,6 +361,7 @@ async function sync() {
   }
 }
 async function pullOnly() {
+  if (DEMO) return;
   // refresh from remote without writing
   if (localOnly()) return;
   try {
@@ -473,7 +478,7 @@ $('#lockForm').addEventListener('submit', async ev => {
 
 /* idle auto-lock */
 let idleT;
-function bump() { clearTimeout(idleT); idleT = setTimeout(() => { if (S.dataKey && !S.formDirty) showLock('閒置太久，已自動鎖定。'); }, IDLE_LOCK_MS); }
+function bump() { clearTimeout(idleT); idleT = setTimeout(() => { if (S.dataKey && !S.formDirty && !DEMO) showLock('閒置太久，已自動鎖定。'); }, IDLE_LOCK_MS); }
 ['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, bump, { passive: true }));
 $('#lockNowBtn').onclick = () => { if (S.formDirty && !confirm('有尚未儲存的內容，確定要鎖定嗎？')) return; showLock(); };
 
@@ -914,6 +919,7 @@ function modal(html) {
 const close = () => { $('#modalRoot').innerHTML = ''; };
 
 $('#settingsBtn').onclick = () => {
+  if (DEMO) { const dm = modal(`<h2>示範模式</h2><p style="font-size:14px">這是展示用的版本：資料只存在這個分頁，重新整理就會還原，也不會連到任何帳號。設定、同步、備份與學生連線 QR 在正式版才能使用。</p><div style="text-align:right"><button class="btn pri" id="dmClose" type="button">關閉</button></div>`); dm.querySelector('#dmClose').onclick = close; return; }
   const m = modal(`
     <h2>設定</h2>
     <div class="field"><label>同步</label>
@@ -1000,7 +1006,39 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.classList?.contains('entry')) ev.target.click(); });
 
 if (!window.crypto?.subtle) { $('#lockErr').textContent = '這個瀏覽器不支援加密，請改用最新版 Chrome / Safari，並用 https 開啟。'; $('#lockBtn').disabled = true; }
-showLock();
+function startDemo() {
+  const d = (n) => { const x = new Date(); x.setDate(x.getDate() - n); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0, 10); };
+  const t = Date.now(), who = '小安';
+  const ent = (id, type, date, lessonNo, data) => ({ id, type, student: who, date, lessonNo, data, createdAt: t, updatedAt: t });
+  const diag = { pronNotes: 'environment、opportunity 重音放錯；th 有聲無聲分不清' };
+  ['A','B','A','C','B'].forEach((a, i) => diag['A_' + (i + 1)] = a);
+  ['B','B','A','B','C'].forEach((a, i) => diag['B_' + (i + 1)] = a);
+  ['A','C','A','D','C'].forEach((a, i) => diag['C1_' + (i + 1)] = a);
+  ['B','C','D','A','A'].forEach((a, i) => diag['C2_' + (i + 1)] = a);
+  for (let i = 1; i <= 10; i++) diag['R_' + i] = [1, 2, 3, 5, 6, 7].includes(i) ? 'o' : 'x';
+  diag.diagNotes = '文法第 3、4 題錯（假設語氣、倒裝）→ 先從句型開始；單字量尚可。';
+  S.entries = [
+    ent('demo1', 'interview', d(14), 1, { q1: '上到 L3，第二次段考 11/26，範圍 L3–L5', q2: '上次段考 62 分，班上中後段', q4: '學校講義、Quizlet', q5: '以前補習班大班課，聽不懂也不敢問', q6: '平日每天約 30 分鐘', h1: '5 分，喜歡英文歌但怕文法', h2: 'Netflix 影集（中文字幕）、英文歌', h4: '抄寫十遍，大概一週就忘', h5: '先查完所有生字再讀', h6: '考前兩天才開始', h7: '文法選擇和中翻英', sa_vocab: '3', sa_grammar: '2', sa_reading: '3', sa_writing: '2', sa_listen: '3', sa_speak: '2', goal: '第二次段考 75 分以上', weakness: '文法觀念不穩、單字背了就忘', nextFocus: '假設語氣、L3 單字小考' }),
+    ent('demo2', 'diagnosis', d(14), 1, diag),
+    ent('demo3', 'lesson', d(7), 2, { duration: '90', textbook: '3', pages: 'p. 48–55', grammar: '假設語氣（與過去事實相反）', focus: '4', understand: '3', hw: '4', ask: '2', quiz: '14 / 20', good: '課文長句會先找主詞動詞了', mistakes: '假設語氣 if 子句時態常用錯（題 3、5）', errorTypes: ['文法觀念', '拼字'],
+      words: [{ w: 'environment', kind: '拼錯', note: 'enviroment' }, { w: 'recipe', kind: '聽不出來', note: '聽成 receipt' }, { w: 'affect', kind: '容易混淆', note: 'effect' }],
+      homework: 'L3 單字 1–30、假設語氣講義 10 題', nextFocus: 'L3 課文第 3–4 段、倒裝句', examDate: d(-16), examRange: 'L3 – L5', nextDate: d(0),
+      p_content: '第三課課文與假設語氣', p_highlight: '會先找主詞動詞再翻譯，長句讀得比較快了', p_improve: '假設語氣的時態', p_method: '每天 3 句「如果當時…」造句', reflection: '假設語氣用生活例子（如果昨天沒熬夜…）比較有效；單字小考時間太長，下次縮到 8 分鐘。' }),
+    ent('demo4', 'lesson', d(0), 3, { duration: '90', textbook: '3', pages: 'p. 56–60', grammar: 'Not until / Only 倒裝句', focus: '4', understand: '4', hw: '5', ask: '3', quiz: '17 / 20', good: '單字小考進步 3 分；假設語氣造句全對', mistakes: '倒裝句忘記助動詞提前', errorTypes: ['文法觀念'],
+      words: [{ w: 'renowned', kind: '新學的字', note: '' }, { w: 'opposition', kind: '難記的字', note: '' }, { w: 'restrict', kind: '認得但不會用', note: 'restrict the use of' }, { w: 'vague', kind: '忘記的字', note: '' }],
+      homework: 'L3 單字 31–60、倒裝句 8 題', nextFocus: 'L4 預習、段考模擬題', examDate: d(-16), examRange: 'L3 – L5', nextDate: d(-7),
+      p_content: '倒裝句與 L3 後半課文', p_highlight: '單字小考從 14 分進步到 17 分', p_improve: '倒裝句', p_method: '看到 Not until / Only 先圈起來，再檢查助動詞', reflection: '學生開始主動問問題了。' }),
+  ];
+  S.dataKey = 'demo'; S.password = null; S.token = null;
+  $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
+  $('#lockNowBtn').classList.add('hidden');
+  const b = document.createElement('div'); b.className = 'demo';
+  b.innerHTML = '<span><b>示範模式</b>・範例資料，可以隨意修改；重新整理就會還原，不會儲存。</span><a href="student/">學生單字本示範 →</a>';
+  $('#app').insertBefore(b, $('#app').firstChild);
+  document.title = 'TutorMe 示範';
+  go('list'); setStatus('ok', '示範模式：不會儲存');
+}
+if (DEMO) startDemo(); else showLock();
 })();
 </script>
 </body>

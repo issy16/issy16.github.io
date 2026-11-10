@@ -94,6 +94,7 @@ textarea{min-height:60px;resize:vertical}
 .modal h2{margin:0 0 14px;font-size:18px;display:flex;align-items:center;gap:8px}
 .modal h2 svg{width:20px;height:20px;color:var(--opt)}
 .row{display:flex;justify-content:space-between;gap:8px;margin-top:16px}
+.demo{background:#fff6e0;border:1px solid #f0d58a;color:#6b4d00;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}.demo a{color:var(--main);font-weight:700;text-decoration:none}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:6px;font-size:14px;z-index:20}
 </style>
 </head>
@@ -158,6 +159,7 @@ const DATA_PATH = slug ? `data/student-${slug}.enc.json` : 'data/student.enc.jso
 const ITER = 310000, IDLE_LOCK_MS = 30 * 60 * 1000;
 const LS_TOKEN = 'tutorme.student.token.v1' + (slug ? '.' + slug : '');
 const LS_LOCAL = 'tutorme.student.local.v1' + (slug ? '.' + slug : '');
+const DEMO = /\/guest(\/|$)/.test(location.pathname);
 // token handed over by the teacher's QR code (#k=...). Fragments never reach the server; remove it from the address bar right away.
 let PENDING = null;
 try { const k = new URLSearchParams(location.hash.slice(1)).get('k'); if (k) PENDING = k; } catch {}
@@ -234,7 +236,7 @@ async function ghPut(blob, sha) {
 const merge = (a, b) => { const m = new Map(); for (const e of [...a, ...b]) { const c = m.get(e.id); if (!c || (e.updatedAt || 0) > (c.updatedAt || 0)) m.set(e.id, e); } return [...m.values()]; };
 const mergeProfile = (a = {}, b = {}) => ((b.updatedAt || 0) > (a.updatedAt || 0) ? b : a);
 const payload = () => ({ words: S.words, profile: S.profile });
-async function saveLocal() { if (S.dataKey) ls.set(LS_LOCAL, JSON.stringify(await seal(S.dataKey, S.dataSalt, { ...payload(), dirty: S.dirty }))); }
+async function saveLocal() { if (DEMO) return; if (S.dataKey) ls.set(LS_LOCAL, JSON.stringify(await seal(S.dataKey, S.dataSalt, { ...payload(), dirty: S.dirty }))); }
 async function adopt(blob) {
   if (blob.salt === b64(S.dataSalt)) return unseal(S.dataKey, blob);
   const salt = unb64(blob.salt), key = await deriveKey(S.password, salt);
@@ -243,6 +245,7 @@ async function adopt(blob) {
 }
 function setStatus(k, t) { $('#syncDot').className = 'dot ' + (k || ''); $('#syncText').textContent = t; }
 async function sync() {
+  if (DEMO) { S.dirty = false; setStatus('ok', '示範模式：不會儲存'); return; }
   if (S.syncing) { S.again = true; return; }
   S.syncing = true; setStatus('busy', '同步中…');
   try {
@@ -328,7 +331,7 @@ $('#lockForm').addEventListener('submit', async ev => {
   finally { btn.disabled = false; btn.textContent = mode === 'setup' ? '建立並開啟' : '開啟'; }
 });
 let idleT;
-const bump = () => { clearTimeout(idleT); idleT = setTimeout(() => { if (S.dataKey && !S.dirty) showLock('閒置太久，已自動鎖定。'); }, IDLE_LOCK_MS); };
+const bump = () => { clearTimeout(idleT); idleT = setTimeout(() => { if (S.dataKey && !S.dirty && !DEMO) showLock('閒置太久，已自動鎖定。'); }, IDLE_LOCK_MS); };
 ['click', 'keydown', 'touchstart'].forEach(e => document.addEventListener(e, bump, { passive: true }));
 $('#lockNowBtn').onclick = () => showLock();
 
@@ -453,6 +456,7 @@ function openSheet(w) {
 
 /* settings */
 $('#settingsBtn').onclick = () => {
+  if (DEMO) { const dm = modal(`<h2>示範模式</h2><p style="font-size:14px">這是展示用的版本：資料只存在這個分頁，重新整理就會還原。</p><div style="text-align:right"><button class="btn pri" id="dmClose" type="button">關閉</button></div>`); dm.querySelector('#dmClose').onclick = close; return; }
   const m = modal(`<h2>設定</h2>
     <div class="field"><label for="sn">名字</label><input id="sn" type="text" value="${esc(S.profile.name)}"></div>
     <button class="btn" id="snBtn" type="button">儲存名字</button>
@@ -504,12 +508,27 @@ $('#settingsBtn').onclick = () => {
 };
 
 document.addEventListener('visibilitychange', async () => {
-  if (document.visibilityState === 'visible' && S.dataKey && !$('#mdl')) {
+  if (document.visibilityState === 'visible' && S.dataKey && !DEMO && !$('#mdl')) {
     try { const r = await ghGet(); if (r) { const d = await adopt(r.blob); S.words = merge(S.words, d.words || []); S.profile = mergeProfile(S.profile, d.profile); S.remoteSha = r.sha; render(); } } catch {}
   }
 });
 if (!window.crypto?.subtle) { $('#lockErr').textContent = '這個瀏覽器不支援，請用最新版 Chrome 或 Safari 開啟。'; $('#lockBtn').disabled = true; }
-showLock();
+function startDemo() {
+  const t = Date.now();
+  const W = [['environment','環境','拼錯','我寫成 enviroment',2],['recipe','食譜','聽不出來','我聽成 receipt',3],['affect','影響（動詞）','容易混淆','和 effect 搞混',1],
+    ['renowned','有名的','新學的字','be renowned for',4],['opposition','反對','難記的字','',2],['restrict','限制','認得但不會用','restrict the use of',3],
+    ['vague','含糊的','忘記的字','',1],['debt','債務','聽不出來','b 不發音',5],['opportunity','機會','拼錯','oppor-tu-ni-ty',4],['abandon','放棄','不會的字','',0]];
+  S.words = W.map(([w, meaning, kind, note, stars], i) => ({ id: 'd' + i, w, meaning, kind, note, stars, createdAt: t - i * 3600e3, updatedAt: t }));
+  S.profile = { name: '小安', updatedAt: t }; S.dataKey = 'demo';
+  $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
+  $('#lockNowBtn').classList.add('hidden');
+  const b = document.createElement('div'); b.className = 'demo';
+  b.innerHTML = '<span><b>示範模式</b>・範例資料，重新整理就會還原。</span><a href="../">← 老師版示範</a>';
+  $('#app').insertBefore(b, $('#app').firstChild);
+  document.title = 'TutorMe 單字本示範';
+  render(); setStatus('ok', '示範模式：不會儲存');
+}
+if (DEMO) startDemo(); else showLock();
 })();
 </script>
 </body>

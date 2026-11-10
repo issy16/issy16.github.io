@@ -1,0 +1,1045 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>TutorMe 上課紀錄</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --main:#2b5c8a; --main-soft:#e8eff6; --ink:#1d2430; --mute:#5b6472; --opt:#3a4350;
+  --line:#c9d1db; --rule:#8a93a0; --panel:#f4f6f9; --bg:#ffffff; --ok:#2f7d4f; --warn:#b3541e; --bad:#b42318;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,'Noto Sans TC','PingFang TC','Noto Sans CJK TC','Microsoft JhengHei',sans-serif;font-size:14px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+.hidden{display:none !important}
+.wrap{max-width:880px;margin:0 auto;padding:20px 16px 60px}
+
+/* top bar */
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding-bottom:10px;border-bottom:2px solid var(--main);margin-bottom:18px;flex-wrap:wrap}
+.kick{font-size:12px;font-weight:600;color:var(--main);letter-spacing:.04em}
+h1{margin:2px 0 0;font-size:24px;line-height:1.2}
+.status{font-size:12px;color:var(--mute);display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--rule)}
+.dot.ok{background:var(--ok)} .dot.busy{background:var(--main)} .dot.err{background:var(--bad)}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+
+/* buttons */
+.btn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:7px 12px;cursor:pointer;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--main)}
+.btn.pri{background:var(--main);border-color:var(--main);color:#fff}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--mute)}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:default}
+
+/* lock */
+.lock{max-width:380px;margin:12vh auto 0;padding:0 16px}
+.lock .card{border:1px solid var(--line);border-radius:8px;padding:22px}
+.lock h1{font-size:22px;margin-bottom:4px}
+.lock p{color:var(--mute);font-size:13px;margin:0 0 16px}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.field label{font-size:13px;font-weight:600}
+.field .hint{font-size:12px;color:var(--mute)}
+input[type=text],input[type=password],input[type=number],input[type=date],select,textarea{
+  width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;background:#fff;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--main);box-shadow:0 0 0 3px var(--main-soft)}
+textarea{min-height:64px;resize:vertical;line-height:1.45}
+.err{color:var(--bad);font-size:13px;min-height:18px;margin-bottom:8px}
+
+/* list */
+.filters{display:grid;grid-template-columns:1fr 1fr 2fr;gap:8px;margin-bottom:12px}
+.new{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.entry{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer;background:#fff}
+.entry:hover{border-color:var(--main)}
+.entry .d{font-weight:700;white-space:nowrap;min-width:86px}
+.entry .d small{display:block;font-weight:400;color:var(--mute);font-size:12px}
+.entry .b{flex:1;min-width:0}
+.entry .t{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:2px}
+.entry .s{color:var(--opt);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{font-size:11px;font-weight:700;border-radius:4px;padding:1px 7px;background:var(--main-soft);color:var(--main)}
+.badge.interview{background:#efeaf6;color:#5a3d8a}
+.badge.diagnosis{background:#eaf4ee;color:var(--ok)}
+.empty{color:var(--mute);text-align:center;padding:40px 0;border:1px dashed var(--line);border-radius:8px}
+
+/* form */
+.sec{margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+.sq{display:inline-flex;width:20px;height:20px;border-radius:4px;background:var(--main);color:#fff;font-size:12px;font-weight:700;align-items:center;justify-content:center;flex:none}
+.sec h2{margin:0;font-size:15px}
+.sec .note{font-size:12px;color:var(--mute)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 12px}
+.rates{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:12px}
+.rate{border:1px solid var(--line);border-radius:6px;padding:8px;text-align:center}
+.rate .k{font-weight:600;font-size:13px;margin-bottom:4px}
+.pills{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.pills label{cursor:pointer;min-width:0}
+.pills input{position:absolute;opacity:0;pointer-events:none}
+.pills span{display:flex;width:100%;height:28px;border:1px solid var(--line);border-radius:5px;align-items:center;justify-content:center;font-size:13px}
+.words{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.wrow{display:grid;grid-template-columns:minmax(0,1.2fr) 130px minmax(0,1.6fr) 32px;gap:6px;align-items:center}
+.wrow .x{border:0;background:none;color:var(--mute);cursor:pointer;font-size:18px;line-height:1;padding:4px}
+.wrow .x:hover{color:var(--bad)}
+.wadd{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.kcard{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid transparent;border-radius:8px;padding:14px 16px;cursor:pointer;font-weight:700;font-size:15px;text-align:left;color:var(--ink)}
+.kcard:hover{border-color:var(--main)}
+.kcard svg{width:20px;height:20px;flex:none;color:var(--opt)}
+.wsum h3{font-size:14px;margin:14px 0 6px}
+.wsum table{width:100%;border-collapse:collapse;font-size:13px}
+.wsum td{padding:4px 6px;border-bottom:1px solid #e3e8ee;vertical-align:top}
+.wsum .rep{font-size:11px;font-weight:700;color:var(--warn);margin-left:4px}
+@media (max-width:640px){.wrow{grid-template-columns:minmax(0,1fr) 110px 32px}.wrow .wn{grid-column:1 / 3}}
+.pills input:checked+span{background:var(--main);border-color:var(--main);color:#fff;font-weight:700}
+.pills input:focus-visible+span{box-shadow:0 0 0 3px var(--main-soft)}
+.checks{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:12px}
+.checks label{font-size:13px;display:flex;gap:5px;align-items:center;cursor:pointer}
+.msgbox{background:var(--panel);border-radius:6px;padding:12px;white-space:pre-wrap;font-size:13px;margin:4px 0 8px}
+.bar{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 0;margin-top:24px;display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+
+/* diagnosis */
+.qtable{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:8px}
+.qtable td{padding:4px 6px;border-bottom:1px solid #e3e8ee;vertical-align:middle}
+.qtable td.n{width:28px;font-weight:700}
+.qtable td.k{color:var(--mute);font-size:12px}
+.abcd{display:inline-flex;gap:3px}
+.abcd label{cursor:pointer}
+.abcd input{position:absolute;opacity:0;pointer-events:none}
+.abcd span{display:inline-flex;min-width:26px;height:24px;padding:0 4px;border:1px solid var(--line);border-radius:5px;align-items:center;justify-content:center;font-size:12px;font-weight:600}
+.abcd input:checked+span{background:var(--ink);border-color:var(--ink);color:#fff}
+.abcd input:checked+span.right{background:var(--ok);border-color:var(--ok)}
+.abcd input:checked+span.wrong{background:var(--bad);border-color:var(--bad)}
+.mark{font-weight:700;width:20px;text-align:center}
+.mark.ok{color:var(--ok)} .mark.no{color:var(--bad)}
+.scores{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;margin:8px 0 12px;text-align:center}
+.scores>div{border:1px solid var(--line);border-radius:6px;padding:6px}
+.scores .k{font-size:12px;color:var(--mute)}
+.scores .v{font-size:18px;font-weight:700}
+.scores .tot{border-color:var(--main);background:var(--main-soft)}
+.advice{border-left:3px solid var(--main);padding:4px 10px;margin:4px 0;font-size:13px}
+.advice b{display:inline-block;min-width:56px}
+
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(29,36,48,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+.modal .card{background:#fff;border-radius:8px;padding:20px;max-width:440px;width:100%;max-height:90vh;overflow:auto}
+.modal h2{margin:0 0 12px;font-size:17px}
+.demo{background:#fff6e0;border:1px solid #f0d58a;color:#6b4d00;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}.demo a{color:var(--main);font-weight:700;text-decoration:none}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:6px;font-size:13px;z-index:20}
+
+@media (max-width:640px){
+  .grid2,.grid3,.filters{grid-template-columns:1fr}
+  .scores{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .entry .d{min-width:70px}
+}
+@media print{
+  .top .tools,.status,.bar,.new,.filters,.no-print{display:none !important}
+  .wrap{max-width:none;padding:0}
+  textarea{border:none;padding:0;min-height:0;resize:none}
+  input{border:none}
+}
+</style>
+</head>
+<body>
+
+<!-- LOCK SCREEN -->
+<div id="lock" class="lock">
+  <div class="card">
+    <div class="kick">TutorMe · 龍騰版 高中英文 第三冊</div>
+    <h1 id="lockTitle">上課紀錄</h1>
+    <p id="lockSub">輸入密碼以開啟紀錄。</p>
+    <form id="lockForm" autocomplete="off">
+      <div class="field">
+        <label for="pw">密碼</label>
+        <input id="pw" type="password" autocomplete="current-password" required>
+      </div>
+      <div class="field hidden" id="pw2Wrap">
+        <label for="pw2">再輸入一次密碼</label>
+        <input id="pw2" type="password" autocomplete="new-password">
+        <span class="hint">密碼無法找回：忘記密碼，紀錄就打不開。請記在安全的地方。</span>
+      </div>
+      <div class="field hidden" id="tokWrap">
+        <label for="tok">GitHub token</label>
+        <input id="tok" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="github_pat_…">
+        <span class="hint">每台裝置只需輸入一次，會用你的密碼加密後存在這台裝置。</span>
+      </div>
+      <div class="err" id="lockErr"></div>
+      <button class="btn pri" id="lockBtn" type="submit" style="width:100%">開啟</button>
+    </form>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="wrap hidden">
+  <header class="top">
+    <div>
+      <div class="kick">TutorMe · 龍騰版 高中英文 第三冊</div>
+      <h1 id="viewTitle">上課紀錄</h1>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+      <div class="status"><span class="dot" id="syncDot"></span><span id="syncText">—</span></div>
+      <div class="tools">
+        <button class="btn ghost" id="settingsBtn" type="button">設定</button>
+        <button class="btn ghost" id="lockNowBtn" type="button">鎖定</button>
+      </div>
+    </div>
+  </header>
+  <main id="view"></main>
+</div>
+
+<div id="modalRoot"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------------- config ---------------- */
+const OWNER = 'issy16';
+const REPO = 'tutorme';
+const BRANCH = 'main';
+const DATA_PATH = 'data/log.enc.json';
+const ITER = 310000;
+const IDLE_LOCK_MS = 30 * 60 * 1000;
+const LS_TOKEN = 'tutorme.token.v1';
+const LS_LOCAL = 'tutorme.local.v1';
+const DEMO = /\/guest(\/|$)/.test(location.pathname); // /tutorme/guest/: sample data, nothing is saved, no token
+
+/* ---------------- state ---------------- */
+const S = {
+  password: null, token: null,
+  dataSalt: null, dataKey: null,
+  remoteSha: null,
+  entries: [],          // includes tombstones {deleted:true}
+  dirty: false,         // unsynced local changes
+  syncing: false,
+  filter: { student: '', type: '', q: '' },
+  editing: null,        // entry being edited (copy)
+  formDirty: false,
+};
+
+/* ---------------- utils ---------------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const enc = new TextEncoder(), dec = new TextDecoder();
+const b64 = buf => { let s=''; const a=new Uint8Array(buf); for (let i=0;i<a.length;i+=0x8000) s+=String.fromCharCode.apply(null,a.subarray(i,i+0x8000)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const today = () => { const d=new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+const fmtDate = s => s ? s.replace(/-/g, ' / ') : '—';
+const ls = {
+  get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+  set(k,v){ try { localStorage.setItem(k,v); } catch {} },
+  del(k){ try { localStorage.removeItem(k); } catch {} },
+};
+function toast(msg, ms = 2200) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), ms);
+}
+
+/* ---------------- crypto ---------------- */
+async function deriveKey(password, salt) {
+  const base = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: ITER },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function seal(key, salt, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(obj)));
+  return { v: 1, kdf: 'PBKDF2-SHA256', iter: ITER, salt: b64(salt), iv: b64(iv), ct: b64(ct) };
+}
+async function open(key, blob) {
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(blob.iv) }, key, unb64(blob.ct));
+  return JSON.parse(dec.decode(pt));
+}
+
+/* ---------------- GitHub ---------------- */
+const API = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${DATA_PATH}`;
+function ghHeaders() {
+  return { 'Accept': 'application/vnd.github+json', 'Authorization': `Bearer ${S.token}`, 'X-GitHub-Api-Version': '2022-11-28' };
+}
+async function ghGet() {
+  const r = await fetch(`${API}?ref=${BRANCH}&t=${Date.now()}`, { headers: ghHeaders(), cache: 'no-store' });
+  if (r.status === 404) {
+    // 404 also means "no access" on a private repo; tell them apart by checking the repo itself
+    const rr = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}`, { headers: ghHeaders(), cache: 'no-store' });
+    if (rr.status === 401 || rr.status === 403 || rr.status === 404) throw new Error('TOKEN');
+    return null;
+  }
+  if (r.status === 401 || r.status === 403) throw new Error('TOKEN');
+  if (!r.ok) throw new Error('NET ' + r.status);
+  const j = await r.json();
+  let text;
+  if (j.content) text = atob(j.content.replace(/\n/g, ''));
+  else { // >1MB files come without content
+    const raw = await fetch(j.git_url, { headers: { ...ghHeaders(), Accept: 'application/vnd.github.raw' } });
+    text = await raw.text();
+  }
+  return { sha: j.sha, blob: JSON.parse(text) };
+}
+async function ghPut(blob, sha) {
+  const body = { message: `log update ${new Date().toISOString()}`, content: btoa(JSON.stringify(blob)), branch: BRANCH };
+  if (sha) body.sha = sha;
+  const r = await fetch(API, { method: 'PUT', headers: { ...ghHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (r.status === 409 || r.status === 422) return { conflict: true };
+  if (r.status === 401 || r.status === 403 || r.status === 404) throw new Error('TOKEN');
+  if (!r.ok) throw new Error('NET ' + r.status);
+  const j = await r.json();
+  return { sha: j.content.sha };
+}
+
+/* ---------------- merge ---------------- */
+function merge(a, b) {
+  const m = new Map();
+  for (const e of [...a, ...b]) {
+    const cur = m.get(e.id);
+    if (!cur || (e.updatedAt || 0) > (cur.updatedAt || 0)) m.set(e.id, e);
+  }
+  return [...m.values()];
+}
+
+/* ---------------- local copy ---------------- */
+async function saveLocal() {
+  if (DEMO) return;
+  if (!S.dataKey) return;
+  const blob = await seal(S.dataKey, S.dataSalt, { entries: S.entries, dirty: S.dirty });
+  ls.set(LS_LOCAL, JSON.stringify(blob));
+}
+async function loadLocal() {
+  const raw = ls.get(LS_LOCAL); if (!raw) return null;
+  try {
+    const blob = JSON.parse(raw);
+    if (blob.salt !== b64(S.dataSalt)) return null;
+    return await open(S.dataKey, blob);
+  } catch { return null; }
+}
+
+/* ---------------- sync ---------------- */
+function setStatus(kind, text) {
+  $('#syncDot').className = 'dot ' + (kind || '');
+  $('#syncText').textContent = text;
+}
+const localOnly = () => !S.token;
+function localStatus() { setStatus('ok', '已存在這台裝置 ' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })); }
+// remote file may use a different salt (local-only data being connected to sync, or a password change elsewhere)
+async function adoptRemote(blob) {
+  if (blob.salt === b64(S.dataSalt)) return open(S.dataKey, blob);
+  const salt = unb64(blob.salt); const key = await deriveKey(S.password, salt);
+  let data; try { data = await open(key, blob); } catch { throw new Error('SALT'); }
+  S.dataSalt = salt; S.dataKey = key;
+  return data;
+}
+async function sync() {
+  if (DEMO) { S.dirty = false; setStatus('ok', '示範模式：不會儲存'); if (!S.editing) render(); return; }
+  if (localOnly()) { S.dirty = false; await saveLocal(); localStatus(); if (!S.editing) render(); return; }
+  if (S.syncing) { S.again = true; return; }
+  S.syncing = true; setStatus('busy', '同步中…');
+  try {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const remote = await ghGet();
+      if (remote) {
+        const r = await adoptRemote(remote.blob);
+        S.entries = merge(S.entries, r.entries || []);
+        S.remoteSha = remote.sha;
+      } else S.remoteSha = null;
+      const blob = await seal(S.dataKey, S.dataSalt, { entries: S.entries });
+      const res = await ghPut(blob, S.remoteSha);
+      if (res.conflict) continue;
+      S.remoteSha = res.sha; S.dirty = false;
+      await saveLocal();
+      setStatus('ok', '已同步 ' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }));
+      if (!S.editing) render();
+      break;
+    }
+  } catch (e) {
+    S.dirty = true; await saveLocal();
+    if (e.message === 'TOKEN') setStatus('err', 'GitHub token 無效或沒有權限（到「設定」更新）');
+    else if (e.message === 'SALT') setStatus('err', '密碼已在其他裝置更改，請重新鎖定後用新密碼開啟');
+    else setStatus('err', '未同步：已暫存在這台裝置，稍後會再試');
+  } finally {
+    S.syncing = false;
+    if (S.again) { S.again = false; sync(); }
+  }
+}
+async function pullOnly() {
+  if (DEMO) return;
+  // refresh from remote without writing
+  if (localOnly()) return;
+  try {
+    setStatus('busy', '讀取中…');
+    const remote = await ghGet();
+    if (remote) {
+      const r = await adoptRemote(remote.blob);
+      S.entries = merge(S.entries, r.entries || []);
+      S.remoteSha = remote.sha;
+    }
+    await saveLocal();
+    if (S.dirty) return sync();
+    setStatus('ok', '已同步');
+  } catch (e) {
+    setStatus('err', e.message === 'TOKEN' ? 'GitHub token 無效或沒有權限' : '無法連線，顯示這台裝置的暫存');
+  }
+}
+
+/* ---------------- unlock ---------------- */
+let lockMode = 'unlock'; // unlock | setup
+function showLock(msg) {
+  S.password = S.token = S.dataKey = S.dataSalt = null; S.entries = []; S.editing = null;
+  $('#app').classList.add('hidden'); $('#lock').classList.remove('hidden');
+  $('#modalRoot').innerHTML = '';
+  $('#pw').value = ''; $('#pw2').value = ''; $('#tok').value = '';
+  $('#tokWrap').classList.toggle('hidden', !!ls.get(LS_TOKEN));
+  $('#pw2Wrap').classList.add('hidden'); lockMode = 'unlock';
+  $('#lockTitle').textContent = '上課紀錄';
+  $('#lockSub').textContent = ls.get(LS_TOKEN) ? '輸入密碼以開啟紀錄。' : '這台裝置第一次使用：請輸入密碼與 GitHub token。';
+  $('#lockBtn').textContent = '開啟';
+  $('#lockErr').textContent = msg || '';
+  setTimeout(() => $('#pw').focus(), 0);
+}
+
+$('#lockForm').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const pw = $('#pw').value; const err = $('#lockErr'); const btn = $('#lockBtn');
+  if (!pw) return;
+  err.textContent = ''; btn.disabled = true; btn.textContent = '開啟中…';
+  try {
+    // 1. token
+    let token;
+    const stored = ls.get(LS_TOKEN);
+    if (stored) {
+      const blob = JSON.parse(stored);
+      try { token = (await open(await deriveKey(pw, unb64(blob.salt)), blob)).token; }
+      catch { throw new Error('密碼錯誤'); }
+    } else {
+      token = $('#tok').value.trim();
+      if (!token) throw new Error('請輸入 GitHub token');
+    }
+    S.token = token;
+
+    // 2. data
+    let remote;
+    try { remote = await ghGet(); }
+    catch (e) {
+      if (e.message === 'TOKEN') { if (stored) ls.del(LS_TOKEN); $('#tokWrap').classList.remove('hidden'); throw new Error('GitHub token 無效或沒有這個 repo 的權限，請重新輸入'); }
+      // offline: try local copy
+      remote = undefined;
+    }
+
+    if (remote === null) {
+      // no data yet → setup
+      if (lockMode !== 'setup') {
+        lockMode = 'setup';
+        $('#pw2Wrap').classList.remove('hidden');
+        $('#lockTitle').textContent = '建立密碼';
+        $('#lockSub').textContent = '還沒有任何紀錄。設定一個密碼，之後所有紀錄都會用它加密。';
+        $('#lockBtn').textContent = '建立並開啟';
+        btn.disabled = false; $('#pw2').focus(); return;
+      }
+      if (pw.length < 8) throw new Error('密碼至少 8 個字元');
+      if (pw !== $('#pw2').value) throw new Error('兩次輸入的密碼不一樣');
+      S.dataSalt = crypto.getRandomValues(new Uint8Array(16));
+      S.dataKey = await deriveKey(pw, S.dataSalt);
+      S.entries = []; S.remoteSha = null; S.dirty = true;
+    } else if (remote) {
+      S.dataSalt = unb64(remote.blob.salt);
+      S.dataKey = await deriveKey(pw, S.dataSalt);
+      let data;
+      try { data = await open(S.dataKey, remote.blob); }
+      catch { throw new Error('密碼錯誤'); }
+      S.entries = data.entries || []; S.remoteSha = remote.sha;
+      const local = await loadLocal();
+      if (local && local.dirty) { S.entries = merge(S.entries, local.entries); S.dirty = true; }
+    } else {
+      // offline
+      const raw = ls.get(LS_LOCAL);
+      if (!raw) throw new Error('無法連線到 GitHub，這台裝置也沒有暫存');
+      const blob = JSON.parse(raw);
+      S.dataSalt = unb64(blob.salt); S.dataKey = await deriveKey(pw, S.dataSalt);
+      let data; try { data = await open(S.dataKey, blob); } catch { throw new Error('密碼錯誤'); }
+      S.entries = data.entries || []; S.dirty = !!data.dirty;
+    }
+
+    // 3. remember token on this device (encrypted with the password)
+    if (!stored) {
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      ls.set(LS_TOKEN, JSON.stringify(await seal(await deriveKey(pw, salt), salt, { token })));
+    }
+    S.password = pw;
+    $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
+    go('list');
+    if (remote === undefined) setStatus('err', '離線：顯示這台裝置的暫存');
+    else if (S.dirty) sync(); else { setStatus('ok', '已同步'); saveLocal(); }
+  } catch (e) {
+    err.textContent = e.message || String(e);
+  } finally {
+    btn.disabled = false;
+    if (lockMode === 'unlock') btn.textContent = '開啟'; else btn.textContent = '建立並開啟';
+  }
+});
+
+/* idle auto-lock */
+let idleT;
+function bump() { clearTimeout(idleT); idleT = setTimeout(() => { if (S.dataKey && !S.formDirty && !DEMO) showLock('閒置太久，已自動鎖定。'); }, IDLE_LOCK_MS); }
+['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, bump, { passive: true }));
+$('#lockNowBtn').onclick = () => { if (S.formDirty && !confirm('有尚未儲存的內容，確定要鎖定嗎？')) return; showLock(); };
+
+/* ---------------- form definitions ---------------- */
+const TYPES = {
+  lesson: { label: '課後紀錄', title: '課後紀錄' },
+  interview: { label: '開場訪談', title: '開場訪談' },
+  diagnosis: { label: '程度診斷', title: '程度診斷（第 1 堂講義）' },
+};
+const ERROR_TYPES = ['單字不會', '片語搭配', '文法觀念', '看錯題目', '閱讀找不到線索', '拼字', '發音 / 重音', '粗心'];
+const KIND_ICONS = {
+  '聽不出來': '<path d="M6 8.5a6 6 0 1 1 12 0c0 3-2 4.2-3 5.2-.9.9-1 2-1 3.3a3 3 0 0 1-5.6 1.5"/><path d="M9 8.5a3 3 0 0 1 6 0"/>',
+  '拼錯': '<path d="M4 20l4-1 11-11-3-3L5 16l-1 4z"/><path d="M14 6l3 3"/>',
+  '不會的字': '<path d="M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3z"/><path d="M21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z"/>',
+  '新學的字': '<path d="M11 3l1.8 5.2L18 10l-5.2 1.8L11 17l-1.8-5.2L4 10l5.2-1.8z"/><path d="M19 14l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/>',
+  '難記的字': '<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 3 3 2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><path d="M15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-3 3 2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>',
+  '認得但不會用': '<path d="M12 21a9 9 0 1 0-8-4.9L3 21l4.9-1A9 9 0 0 0 12 21z"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5"/><path d="M12 16.5h.01"/>',
+  '容易混淆': '<path d="M4 8h15l-3-3"/><path d="M20 16H5l3 3"/>',
+  '忘記的字': '<path d="M20 12a8 8 0 1 1-2.3-5.7L20 8"/><path d="M20 4v4h-4"/>',
+};
+const WORD_KINDS = Object.keys(KIND_ICONS);
+const kindIcon = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${KIND_ICONS[k] || ''}</svg>`;
+const NOTE_PH = { '拼錯': '學生寫成…', '容易混淆': '和哪個字混淆…', '聽不出來': '聽成…', '認得但不會用': '例句或用法…' };
+
+// diagnosis answer key (第1堂學生講義 2026-11-10)
+const KEY = {
+  A: { name: '單字', pts: 4, ans: ['A','B','A','A','B'], ex: [
+    'achieve one\'s dream 實現夢想', 'strong opposition 強烈反對', 'restrict the use of 限制使用', 'vague 含糊的；nobody understood 為線索', 'be renowned for 以…聞名'] },
+  B: { name: '文法', pts: 4, ans: ['B','C','C','B','B'], ex: [
+    '分詞構句：被動 → Seen', '先行詞 the day → when', '與過去事實相反：had had', 'Not until 置首 → 倒裝 did he realize', '名詞子句作主詞 → What'] },
+  C1: { name: '發音', pts: 4, ans: ['A','C','B','D','B'], ex: [
+    'food /uː/；其餘 /ʊ/', 'bread /ɛ/；其餘 /iː/', 'played /d/；其餘 /t/', 'challenge /tʃ/；其餘 /k/', 'though /ð/；其餘 /θ/'] },
+  C2: { name: '重音', pts: 4, ans: ['A','C','D','B','A'], ex: [
+    'de-CIDE 第 2 音節', 'DIF-ferent 第 1 音節', 'en-VI-ron-ment 第 2 音節', 'CHAR-ac-ter 第 1 音節', 'PHO-to-graph 第 1 音節'] },
+};
+const READ_WORDS = [
+  ['comfortable','/ˈkʌmf-tər-bəl/ 三音節'], ['vegetable','/ˈvɛdʒ-tə-bəl/ 三音節'], ['island','s 不發音'], ['chaos','ch 唸 /k/'],
+  ['debt','b 不發音'], ['recipe','/ˈrɛ-sə-pi/ 字尾 e 要唸'], ['schedule','/ˈskɛ-dʒul/ 或 /ˈʃɛ-djuːl/'],
+  ['opportunity','重音在 tu'], ['environment','重音在 vi'], ['technology','重音在 nol'],
+];
+const ADVICE = {
+  A: ['先補國中 2000 字與字根字首', '每週固定範圍小考＋例句記憶', '第三冊程度可，改練同義字與片語搭配'],
+  B: ['從子句與時態基礎重建，一次一個主題', '錯哪題就從哪個文法點開始', '直接進課文句型、段考題型'],
+  C: ['教 KK 音標，單字表一律附音標朗讀', '每堂 5 分鐘：自然發音規則＋跟讀', '不另外安排，課文朗讀時順帶修正'],
+};
+const band = s => s <= 6 ? 0 : s <= 14 ? 1 : 2;
+
+function newEntry(type) {
+  const students = studentNames();
+  const last = S.entries.filter(e => !e.deleted).sort(byDateDesc)[0];
+  const nextNo = Math.max(0, ...S.entries.filter(e => !e.deleted && e.type === 'lesson').map(e => +e.lessonNo || 0)) + 1;
+  return { id: uid(), type, date: today(), student: last?.student || students[0] || '',
+    lessonNo: type === 'lesson' ? nextNo : 1, data: {}, createdAt: Date.now(), updatedAt: Date.now() };
+}
+
+/* ---------------- views ---------------- */
+function go(view, entry) {
+  if (view === 'list') { S.editing = null; S.formDirty = false; }
+  else S.editing = entry;
+  render();
+  window.scrollTo(0, 0);
+}
+const live = () => S.entries.filter(e => !e.deleted);
+const byDateDesc = (a, b) => (b.date || '').localeCompare(a.date || '') || (b.lessonNo || 0) - (a.lessonNo || 0) || b.createdAt - a.createdAt;
+const studentNames = () => [...new Set(live().map(e => e.student).filter(Boolean))].sort();
+
+function render() {
+  if (!S.dataKey) return;
+  if (S.editing) return renderForm();
+  $('#viewTitle').textContent = '上課紀錄';
+  const f = S.filter;
+  const names = studentNames();
+  let rows = live().sort(byDateDesc);
+  if (f.student) rows = rows.filter(e => e.student === f.student);
+  if (f.type) rows = rows.filter(e => e.type === f.type);
+  if (f.q) { const q = f.q.toLowerCase(); rows = rows.filter(e => JSON.stringify(e).toLowerCase().includes(q)); }
+
+  $('#view').innerHTML = `
+    <div class="new">
+      <button class="btn pri" data-new="lesson" type="button">＋ 課後紀錄</button>
+      <button class="btn" data-new="interview" type="button">＋ 開場訪談</button>
+      <button class="btn" data-new="diagnosis" type="button">＋ 程度診斷</button>
+      <button class="btn ghost" id="wordsBtn" type="button" style="margin-left:auto">單字總表</button>
+    </div>
+    <div class="filters">
+      <select id="fStudent" aria-label="學生"><option value="">所有學生</option>${names.map(n => `<option ${n === f.student ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
+      <select id="fType" aria-label="類型"><option value="">所有類型</option>${Object.entries(TYPES).map(([k, t]) => `<option value="${k}" ${k === f.type ? 'selected' : ''}>${t.label}</option>`).join('')}</select>
+      <input id="fQ" type="text" placeholder="搜尋內容…" value="${esc(f.q)}" aria-label="搜尋">
+    </div>
+    ${rows.length ? rows.map(rowHtml).join('') : `<div class="empty">${live().length ? '沒有符合的紀錄' : '還沒有紀錄。上完課後按「＋ 課後紀錄」新增第一筆。'}</div>`}
+  `;
+  $('#view').querySelectorAll('[data-new]').forEach(b => b.onclick = () => go('form', newEntry(b.dataset.new)));
+  $('#view').querySelectorAll('.entry').forEach(el => el.onclick = () => {
+    const e = S.entries.find(x => x.id === el.dataset.id); go('form', structuredClone(e));
+  });
+  $('#wordsBtn').onclick = showWordSummary;
+  $('#fStudent').onchange = e => { f.student = e.target.value; render(); };
+  $('#fType').onchange = e => { f.type = e.target.value; render(); };
+  $('#fQ').oninput = e => { f.q = e.target.value; const pos = e.target.selectionStart; render(); const q = $('#fQ'); q.focus(); q.setSelectionRange(pos, pos); };
+}
+
+function summary(e) {
+  const d = e.data || {};
+  if (e.type === 'lesson') return [d.textbook && `Lesson ${d.textbook}`, d.grammar, d.quiz && `小考 ${d.quiz}`].filter(Boolean).join('・') || d.nextFocus || '';
+  if (e.type === 'interview') return d.goal ? `目標：${d.goal}` : (d.q1 || '');
+  if (e.type === 'diagnosis') { const sc = scoreDiagnosis(d); return `總分 ${sc.total} / 100・單字 ${sc.A}・文法 ${sc.B}・發音 ${sc.C1}・重音 ${sc.C2}・朗讀 ${sc.C3}`; }
+  return '';
+}
+function rowHtml(e) {
+  return `<div class="entry" data-id="${esc(e.id)}" role="button" tabindex="0">
+    <div class="d">${fmtDate(e.date)}<small>第 ${esc(e.lessonNo || '—')} 堂</small></div>
+    <div class="b">
+      <div class="t"><span class="badge ${e.type}">${TYPES[e.type]?.label || e.type}</span><b>${esc(e.student || '（未填學生）')}</b></div>
+      <div class="s">${esc(summary(e)) || '<span style="color:var(--mute)">（空白）</span>'}</div>
+    </div></div>`;
+}
+
+/* ---------- form building helpers ---------- */
+const v = k => esc(S.editing.data[k] ?? '');
+const sec = (n, title, note = '') => `<div class="sec"><span class="sq">${n}</span><h2>${title}</h2>${note ? `<span class="note">${note}</span>` : ''}</div>`;
+const fText = (k, label, ph = '') => `<div class="field"><label for="f_${k}">${label}</label><input id="f_${k}" type="text" data-k="${k}" value="${v(k)}" placeholder="${esc(ph)}"></div>`;
+const fArea = (k, label, rows = 2, ph = '') => `<div class="field"><label for="f_${k}">${label}</label><textarea id="f_${k}" data-k="${k}" rows="${rows}" placeholder="${esc(ph)}">${v(k)}</textarea></div>`;
+const fDate = (k, label) => `<div class="field"><label for="f_${k}">${label}</label><input id="f_${k}" type="date" data-k="${k}" value="${v(k)}"></div>`;
+const fRate = (k, label) => `<div class="rate"><div class="k">${label}</div><div class="pills" role="radiogroup" aria-label="${label}">${[1,2,3,4,5].map(i =>
+  `<label><input type="radio" name="r_${k}" data-k="${k}" value="${i}" ${String(S.editing.data[k]) === String(i) ? 'checked' : ''}><span>${i}</span></label>`).join('')}</div></div>`;
+
+function headerFields() {
+  const e = S.editing;
+  return `<div class="grid3">
+    <div class="field"><label for="m_student">學生</label><input id="m_student" type="text" list="studentList" data-m="student" value="${esc(e.student)}" placeholder="學生姓名"><datalist id="studentList">${studentNames().map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>
+    <div class="field"><label for="m_date">日期</label><input id="m_date" type="date" data-m="date" value="${esc(e.date)}"></div>
+    <div class="field"><label for="m_no">第幾堂</label><input id="m_no" type="number" min="1" data-m="lessonNo" value="${esc(e.lessonNo)}"></div>
+  </div>`;
+}
+
+function lessonForm() {
+  const d = S.editing.data; const errs = d.errorTypes || [];
+  return `
+    ${headerFields()}
+    <div class="grid2">${fText('duration', '上課時間（分鐘）', '90')}<div></div></div>
+    ${sec(1, '本堂內容', '課次、文法點、單字範圍、題型')}
+    <div class="grid2">
+      ${fText('textbook', '課本進度　Lesson', '例：3')}
+      ${fText('pages', '頁數', '例：p. 45–52')}
+    </div>
+    ${fArea('grammar', '文法 / 句型', 2)}
+    ${sec(2, '學生表現', '1 = 需加強，5 = 很好')}
+    <div class="rates">${fRate('focus', '專注度')}${fRate('understand', '理解程度')}${fRate('hw', '作業完成')}${fRate('ask', '主動發問')}
+      <div class="rate"><div class="k">單字小考</div><input type="text" data-k="quiz" value="${v('quiz')}" placeholder="18 / 20" style="text-align:center" aria-label="單字小考分數"></div></div>
+    <div class="grid2">${fArea('good', '做得好的地方')}${fArea('mistakes', '常錯的地方（題號、類型、原因）')}</div>
+    <div class="field"><label>錯誤類型</label></div>
+    <div class="checks">${ERROR_TYPES.map(t => `<label><input type="checkbox" data-arr="errorTypes" value="${esc(t)}" ${errs.includes(t) ? 'checked' : ''}>${esc(t)}</label>`).join('')}</div>
+    ${sec(3, '單字紀錄')}
+    <div class="words" id="wordRows">${wordRowsHtml()}</div>
+    <div class="wadd no-print">${WORD_KINDS.map(k => `<button class="kcard" type="button" data-addword="${k}">${kindIcon(k)}${k}</button>`).join('')}</div>
+    ${sec(4, '作業與下次準備')}
+    <div class="grid2">${fArea('homework', '回家作業（範圍、繳交方式）', 3)}${fArea('nextFocus', '下堂課重點 / 要準備的講義', 3)}</div>
+    <div class="grid3">${fDate('examDate', '下次段考')}${fText('examRange', '段考範圍', 'L1 – L3')}${fDate('nextDate', '下次上課')}</div>
+    ${sec(5, '給學生的回饋', '先寫亮點，再寫一項重點，最後給具體作法；家長想看可以問學生')}
+    <div class="grid2">
+      ${fText('p_content', '今天上了', '第三課課文長句與分詞構句')}
+      ${fText('p_highlight', '你做得很好的是', '單字小考進步到 18 分')}
+      ${fText('p_improve', '接下來要加強', '假設語氣')}
+      ${fText('p_method', '方法是', '每天 5 句改錯練習')}
+    </div>
+    ${fText('p_homework', '這週作業（留空會用上面的回家作業）')}
+    <div class="field"><label>訊息預覽（單字紀錄會自動加進去）</label></div>
+    <div class="msgbox" id="stuMsg"></div>
+    <button class="btn no-print" type="button" id="copyMsg">複製訊息</button>
+    ${sec(6, '教學反思', '哪個活動有效、哪裡要調整、時間分配')}
+    ${fArea('reflection', '', 4)}
+  `;
+}
+function wordRowsHtml() {
+  const words = S.editing.data.words || [];
+  if (!words.length) return '<div class="note" style="color:var(--mute);font-size:13px">依照學生遇到的問題新增單字</div>';
+  return words.map((w, i) => `<div class="wrow">
+    <input type="text" data-wi="${i}" data-wf="w" value="${esc(w.w)}" placeholder="正確單字" aria-label="單字">
+    <select data-wi="${i}" data-wf="kind" aria-label="類型">${[...new Set([...WORD_KINDS, w.kind])].map(k => `<option ${k === w.kind ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
+    <input class="wn" type="text" data-wi="${i}" data-wf="note" value="${esc(w.note)}" placeholder="${NOTE_PH[w.kind] || '備註'}" aria-label="備註">
+    <button class="x no-print" type="button" data-delword="${i}" aria-label="刪除這個單字">×</button>
+  </div>`).join('');
+}
+function wordLines(words) {
+  const ok = (words || []).filter(w => (w.w || '').trim());
+  const out = [];
+  for (const k of [...new Set([...WORD_KINDS, ...ok.map(w => w.kind)])]) {
+    const g = ok.filter(w => w.kind === k);
+    if (!g.length) continue;
+    const list = g.map(w => !w.note ? w.w.trim() : k === '拼錯' ? `${w.w.trim()}（不是 ${w.note.trim()}）` : k === '容易混淆' ? `${w.w.trim()}（和 ${w.note.trim()} 混淆）` : w.w.trim()).join('、');
+    out.push(`・${k}：${list}`);
+  }
+  return out;
+}
+function studentMessage() {
+  const e = S.editing, d = e.data;
+  const name = e.student || '＿＿';
+  const hw = d.p_homework || d.homework || '＿＿';
+  const next = d.nextDate ? d.nextDate.slice(5).replace('-', '/') : '＿＿';
+  const wl = wordLines(d.words);
+  return `${name}，今天辛苦了！\n` +
+    `今天我們上了：${d.p_content || '＿＿'}。\n` +
+    `你做得很好的是：${d.p_highlight || '＿＿'}。\n` +
+    `接下來要加強：${d.p_improve || '＿＿'}，方法是${d.p_method || '＿＿'}。\n` +
+    (wl.length ? `要複習的單字：\n${wl.join('\n')}\n` : '') +
+    `這週作業：${hw}。\n下次上課 ${next} 見，有問題隨時問我！`;
+}
+
+function interviewForm() {
+  const L = ['第三冊上到第幾課？下次段考何時、範圍？', '最近段考、模考英文大約幾分？在班上的位置？', '最近的試卷（小考／段考）', '除了課本，現在用哪些講義、參考書或 App？', '以前補習或家教，什麼有用、什麼沒用？', '一週能留多少時間給英文（不含上課）？'];
+  const H = ['喜歡英文嗎？1–10 分，為什麼？', '平常會接觸英文嗎？影集、歌、遊戲、YouTube？', '哪一些課文特別有趣或特別無聊？', '怎麼背單字？背完多久會忘？', '拿到課文怎麼讀？先查單字還是先讀完？', '考前怎麼準備？提前幾天開始？', '最常在哪種題型失分？最怕英文哪部分？'];
+  const SA = [['sa_vocab', '單字'], ['sa_grammar', '文法'], ['sa_reading', '閱讀'], ['sa_writing', '翻譯寫作'], ['sa_listen', '聽力'], ['sa_speak', '口說']];
+  return `
+    ${headerFields()}
+    <div class="grid2">
+      <div>${sec(1, '學習狀況')}${L.map((q, i) => fArea('q' + (i + 1), `${i + 1}. ${q}`, i === 2 ? 3 : 2)).join('')}</div>
+      <div>${sec(2, '興趣、習慣與弱點')}${H.map((q, i) => fArea('h' + (i + 1), `${i + 1}. ${q}`, 2)).join('')}</div>
+    </div>
+    ${sec(3, '學生自評', '請學生選，1 = 很弱，5 = 很好')}
+    <div class="rates">${SA.map(([k, l]) => fRate(k, l)).join('')}</div>
+    ${sec(4, '訪談小結')}
+    <div class="grid3">${fArea('goal', '目標', 3)}${fArea('weakness', '主要弱點', 3)}${fArea('nextFocus', '下堂課重點', 3)}</div>
+  `;
+}
+
+function scoreDiagnosis(d) {
+  const sc = { total: 0 };
+  for (const [s, k] of Object.entries(KEY)) {
+    sc[s] = k.ans.reduce((t, a, i) => t + (d[`${s}_${i + 1}`] === a ? k.pts : 0), 0);
+    sc.total += sc[s];
+  }
+  sc.C3 = READ_WORDS.reduce((t, _, i) => t + (d[`R_${i + 1}`] === 'o' ? 2 : 0), 0);
+  sc.total += sc.C3;
+  return sc;
+}
+function diagnosisForm() {
+  const d = S.editing.data;
+  const qRows = (s) => KEY[s].ans.map((a, i) => {
+    const k = `${s}_${i + 1}`; const pick = d[k];
+    return `<tr><td class="n">${i + 1}.</td><td><span class="abcd">${['A','B','C','D'].map(o =>
+      `<label><input type="radio" name="${k}" data-k="${k}" value="${o}" ${pick === o ? 'checked' : ''}><span class="${o === a ? 'right' : 'wrong'}">${o}</span></label>`).join('')}</span></td>
+      <td class="mark ${pick ? (pick === a ? 'ok' : 'no') : ''}">${pick ? (pick === a ? '○' : '×') : ''}</td>
+      <td class="k">${pick && pick !== a ? `答案 ${a}・` : ''}${esc(KEY[s].ex[i])}</td></tr>`;
+  }).join('');
+  const block = (n, s, note) => `<div>${sec(n, KEY[s].name, note)}<table class="qtable">${qRows(s)}</table></div>`;
+  return `
+    ${headerFields()}
+    <p class="note" style="color:var(--mute);font-size:13px;margin:0">點選學生寫的答案，系統自動批改與計分。對應 2026-11-10 第 1 堂學生講義。</p>
+    <div class="grid2">
+      ${block('A', 'A', '每題 4 分')}
+      ${block('B', 'B', '每題 4 分')}
+      ${block('C', 'C1', '發音不同・每題 4 分')}
+      ${block('C', 'C2', '重音不同・每題 4 分')}
+    </div>
+    ${sec('C', '朗讀', '每字 2 分・○ 正確、× 需加強')}
+    <table class="qtable"><tbody>${READ_WORDS.map(([w, tip], i) => {
+      const k = `R_${i + 1}`;
+      return `<tr><td style="width:120px"><b>${w}</b></td><td style="width:90px"><span class="abcd">
+        <label><input type="radio" name="${k}" data-k="${k}" value="o" ${d[k] === 'o' ? 'checked' : ''}><span class="right">○</span></label>
+        <label><input type="radio" name="${k}" data-k="${k}" value="x" ${d[k] === 'x' ? 'checked' : ''}><span class="wrong">×</span></label></span></td>
+        <td class="k">${esc(tip)}</td></tr>`;
+    }).join('')}</tbody></table>
+    ${fArea('pronNotes', '發音觀察（常錯的音）', 2)}
+    ${sec('D', '分數與診斷')}
+    <div id="diagOut"></div>
+    ${fArea('diagNotes', '老師補充（錯題類型、下堂課計畫）', 3)}
+  `;
+}
+function diagOutHtml() {
+  const sc = scoreDiagnosis(S.editing.data);
+  const cAvg = Math.round((sc.C1 + sc.C2 + sc.C3) / 3);
+  return `<div class="scores">
+      <div><div class="k">A 單字</div><div class="v">${sc.A}</div></div>
+      <div><div class="k">B 文法</div><div class="v">${sc.B}</div></div>
+      <div><div class="k">C1 發音</div><div class="v">${sc.C1}</div></div>
+      <div><div class="k">C2 重音</div><div class="v">${sc.C2}</div></div>
+      <div><div class="k">C3 朗讀</div><div class="v">${sc.C3}</div></div>
+      <div class="tot"><div class="k">總分</div><div class="v">${sc.total}</div></div>
+    </div>
+    <div class="advice"><b>單字</b>${ADVICE.A[band(sc.A)]}</div>
+    <div class="advice"><b>文法</b>${ADVICE.B[band(sc.B)]}</div>
+    <div class="advice"><b>發音</b>${ADVICE.C[band(cAvg)]}（發音、重音、朗讀平均 ${cAvg} / 20）</div>`;
+}
+
+function renderForm() {
+  const e = S.editing; const isNew = !S.entries.some(x => x.id === e.id);
+  $('#viewTitle').textContent = `${TYPES[e.type].title}${isNew ? '・新增' : ''}`;
+  const body = e.type === 'lesson' ? lessonForm() : e.type === 'interview' ? interviewForm() : diagnosisForm();
+  $('#view').innerHTML = `<form id="entryForm" autocomplete="off">${body}
+    <div class="bar">
+      <div style="display:flex;gap:8px">
+        <button class="btn" type="button" id="backBtn">← 返回列表</button>
+        ${isNew ? '' : '<button class="btn danger" type="button" id="delBtn">刪除</button>'}
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" type="button" id="printBtn">列印</button>
+        <button class="btn pri" type="submit">儲存</button>
+      </div>
+    </div></form>`;
+  const form = $('#entryForm');
+  const refresh = () => {
+    if (e.type === 'lesson') $('#stuMsg').textContent = studentMessage();
+    if (e.type === 'diagnosis') $('#diagOut').innerHTML = diagOutHtml();
+  };
+  const redrawWords = (focusLast) => {
+    $('#wordRows').innerHTML = wordRowsHtml();
+    if (focusLast) { const ins = $('#wordRows').querySelectorAll('input[data-wf=w]'); ins[ins.length - 1]?.focus(); }
+    refresh();
+  };
+  form.addEventListener('click', ev => {
+    const add = ev.target.closest('[data-addword]'), del = ev.target.closest('[data-delword]');
+    if (add) { (e.data.words ||= []).push({ w: '', kind: add.dataset.addword, note: '' }); S.formDirty = true; redrawWords(true); }
+    if (del) { e.data.words.splice(+del.dataset.delword, 1); S.formDirty = true; redrawWords(false); }
+  });
+  form.addEventListener('keydown', ev => {
+    // Enter in a word row adds another row of the same kind instead of submitting
+    const t = ev.target;
+    if (ev.key === 'Enter' && t.dataset.wi !== undefined && !ev.isComposing) {
+      ev.preventDefault(); const kind = e.data.words[+t.dataset.wi].kind;
+      e.data.words.push({ w: '', kind, note: '' }); redrawWords(true);
+    }
+  });
+  form.addEventListener('input', ev => {
+    const t = ev.target; S.formDirty = true;
+    if (t.dataset.wi !== undefined) {
+      e.data.words[+t.dataset.wi][t.dataset.wf] = t.value;
+      if (t.dataset.wf === 'kind') return redrawWords(false);
+      return refresh();
+    }
+    if (t.dataset.m) e[t.dataset.m] = t.type === 'number' ? (t.value === '' ? '' : +t.value) : t.value;
+    else if (t.dataset.arr) {
+      const arr = new Set(e.data[t.dataset.arr] || []); t.checked ? arr.add(t.value) : arr.delete(t.value);
+      e.data[t.dataset.arr] = [...arr];
+    } else if (t.dataset.k) e.data[t.dataset.k] = t.value;
+    if (e.type === 'diagnosis' && t.type === 'radio' && /^[A-C]/.test(t.dataset.k || '')) {
+      // update the ○/× mark in that row
+      const row = t.closest('tr'); const s = t.dataset.k.split('_')[0];
+      if (KEY[s]) {
+        const i = +t.dataset.k.split('_')[1] - 1, a = KEY[s].ans[i];
+        const m = row.querySelector('.mark'); m.className = 'mark ' + (t.value === a ? 'ok' : 'no'); m.textContent = t.value === a ? '○' : '×';
+        row.querySelector('td.k').textContent = (t.value !== a ? `答案 ${a}・` : '') + KEY[s].ex[i];
+      }
+    }
+    refresh();
+  });
+  form.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    e.updatedAt = Date.now();
+    const i = S.entries.findIndex(x => x.id === e.id);
+    if (i >= 0) S.entries[i] = structuredClone(e); else S.entries.push(structuredClone(e));
+    S.dirty = true; S.formDirty = false;
+    await saveLocal(); toast('已儲存'); go('list'); sync();
+  });
+  $('#backBtn').onclick = () => { if (S.formDirty && !confirm('有尚未儲存的內容，確定要離開嗎？')) return; go('list'); };
+  $('#printBtn').onclick = () => window.print();
+  const del = $('#delBtn');
+  if (del) del.onclick = async () => {
+    if (!confirm('確定刪除這筆紀錄？')) return;
+    const i = S.entries.findIndex(x => x.id === e.id);
+    S.entries[i] = { id: e.id, deleted: true, updatedAt: Date.now() };
+    S.dirty = true; await saveLocal(); toast('已刪除'); go('list'); sync();
+  };
+  const copy = $('#copyMsg');
+  if (copy) copy.onclick = async () => {
+    try { await navigator.clipboard.writeText(studentMessage()); toast('已複製，可以貼到 LINE'); }
+    catch { toast('無法自動複製，請手動選取文字'); }
+  };
+  refresh();
+}
+
+/* ---------------- word summary ---------------- */
+function showWordSummary() {
+  const f = S.filter;
+  const lessons = live().filter(e => e.type === 'lesson' && (!f.student || e.student === f.student)).sort(byDateDesc);
+  const map = new Map(); // kind|word -> {w, kind, notes:[], dates:[]}
+  for (const e of lessons) for (const w of (e.data.words || [])) {
+    const word = (w.w || '').trim(); if (!word) continue;
+    const key = w.kind + '|' + word.toLowerCase();
+    const it = map.get(key) || { w: word, kind: w.kind, notes: [], dates: [] };
+    if (w.note && !it.notes.includes(w.note.trim())) it.notes.push(w.note.trim());
+    it.dates.push(e.date); map.set(key, it);
+  }
+  const groups = [...new Set([...WORD_KINDS, ...[...map.values()].map(x => x.kind)])].map(k => [k, [...map.values()].filter(x => x.kind === k).sort((a, b) => b.dates.length - a.dates.length || (b.dates[0] || '').localeCompare(a.dates[0] || ''))]);
+  const total = map.size;
+  const text = groups.filter(([, g]) => g.length).map(([k, g]) => `【${k}】\n` + g.map(x => x.w + (x.notes.length ? `（${x.notes.join('、')}）` : '')).join('\n')).join('\n\n');
+  const m = modal(`<h2>單字總表${f.student ? `・${esc(f.student)}` : ''}</h2>
+    <div class="wsum">
+    ${total ? groups.filter(([, g]) => g.length).map(([k, g]) => `<h3>${k}（${g.length}）</h3><table>${g.map(x =>
+      `<tr><td style="width:40%"><b>${esc(x.w)}</b>${x.dates.length > 1 ? `<span class="rep">×${x.dates.length}</span>` : ''}</td><td>${esc(x.notes.join('、'))}</td><td style="width:80px;color:var(--mute);font-size:12px">${fmtDate(x.dates[0]).replace(/^\d{4} \/ /, '')}</td></tr>`).join('')}</table>`).join('')
+      : '<p style="color:var(--mute)">還沒有記錄任何單字。在課後紀錄的「單字紀錄」新增。</p>'}
+    </div>
+    <p style="font-size:12px;color:var(--mute)">×2 以上表示在不同堂課重複出錯，優先複習。篩選學生後再開啟，可以只看那位學生。</p>
+    <div style="display:flex;justify-content:space-between;gap:8px;margin-top:12px">
+      <button class="btn" id="wCopy" type="button" ${total ? '' : 'disabled'}>複製清單</button>
+      <button class="btn pri" id="wClose" type="button">關閉</button>
+    </div>`);
+  m.querySelector('#wClose').onclick = close;
+  m.querySelector('#wCopy').onclick = async () => { try { await navigator.clipboard.writeText(text); toast('已複製'); } catch { toast('無法自動複製'); } };
+}
+
+/* ---------------- student QR ---------------- */
+function loadQRLib() {
+  if (window.QRCode) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload = res; s.onerror = () => rej(new Error('QR 產生器載入失敗，請檢查網路'));
+    document.head.appendChild(s);
+  });
+}
+async function showStudentQR(slugIn) {
+  const s = String(slugIn || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 30);
+  const base = new URL('student/' + (s ? '?s=' + s : ''), location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, ''));
+  const link = base.href + '#k=' + encodeURIComponent(S.token);
+  const m = modal(`<h2>學生連線 QR</h2>
+    <p style="margin:0 0 10px;font-size:13px;color:var(--mute)">請學生用手機相機掃描，打開後設定自己的密碼即可。</p>
+    <div id="qrBox" style="display:flex;justify-content:center;padding:12px;background:#fff;border:1px solid var(--line);border-radius:8px;min-height:240px;align-items:center">載入中…</div>
+    <p style="font-size:12px;color:var(--mute);margin:8px 0 0">QR code 裡含有 token，不要拍照或傳到群組。掃完就關閉這個視窗。<br>網址：${esc(base.href)}</p>
+    <div style="display:flex;justify-content:space-between;gap:8px;margin-top:12px">
+      <button class="btn" id="qrCopy" type="button">複製連結</button>
+      <button class="btn pri" id="qrClose" type="button">關閉</button>
+    </div>`);
+  m.querySelector('#qrClose').onclick = close;
+  m.querySelector('#qrCopy').onclick = async () => { try { await navigator.clipboard.writeText(link); toast('已複製（含 token，請小心傳送）'); } catch { toast('無法自動複製'); } };
+  try {
+    await loadQRLib();
+    const box = m.querySelector('#qrBox'); if (!box) return; box.textContent = '';
+    new QRCode(box, { text: link, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.M });
+  } catch (e) { const box = m.querySelector('#qrBox'); if (box) box.textContent = e.message; }
+}
+
+/* ---------------- settings ---------------- */
+function modal(html) {
+  $('#modalRoot').innerHTML = `<div class="modal" id="mdl"><div class="card">${html}</div></div>`;
+  $('#mdl').addEventListener('click', ev => { if (ev.target.id === 'mdl') close(); });
+  return $('#mdl');
+}
+const close = () => { $('#modalRoot').innerHTML = ''; };
+
+$('#settingsBtn').onclick = () => {
+  if (DEMO) { const dm = modal(`<h2>示範模式</h2><p style="font-size:14px">這是展示用的版本：資料只存在這個分頁，重新整理就會還原，也不會連到任何帳號。設定、同步、備份與學生連線 QR 在正式版才能使用。</p><div style="text-align:right"><button class="btn pri" id="dmClose" type="button">關閉</button></div>`); dm.querySelector('#dmClose').onclick = close; return; }
+  const m = modal(`
+    <h2>設定</h2>
+    <div class="field"><label>同步</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="sNow" type="button">立即同步</button></div>
+      <span class="hint">紀錄存在 ${OWNER}/${REPO} 的 ${DATA_PATH}，內容已用你的密碼加密。</span></div>
+    <div class="field"><label>備份</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="sExport" type="button">匯出備份（未加密 JSON）</button>
+        <label class="btn" style="display:inline-block">匯入備份<input type="file" id="sImport" accept="application/json" class="hidden"></label>
+      </div>
+      <span class="hint">匯出的檔案沒有加密，請存在安全的地方。匯入會與現有紀錄合併。</span></div>
+    <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+    <h2 style="font-size:15px">更改密碼</h2>
+    <div class="field"><label for="cp1">新密碼</label><input id="cp1" type="password" autocomplete="new-password"></div>
+    <div class="field"><label for="cp2">再輸入一次</label><input id="cp2" type="password" autocomplete="new-password"></div>
+    <div class="err" id="cpErr"></div>
+    <button class="btn" id="cpBtn" type="button">更改密碼</button>
+    <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+    <h2 style="font-size:15px">學生連線 QR</h2>
+    <div class="field"><label for="qrSlug">學生代號（選填）</label><input id="qrSlug" type="text" placeholder="留空 = /tutorme/student/；例：amy" autocapitalize="off" spellcheck="false">
+      <span class="hint">讓學生用手機相機掃描，就不用在學生裝置輸入 token。</span></div>
+    <button class="btn" id="qrBtn" type="button">顯示 QR code</button>
+    <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+    <h2 style="font-size:15px">GitHub token</h2>
+    <div class="field"><label for="nt">換一個 token</label><input id="nt" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="github_pat_…"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="ntBtn" type="button">更新 token</button>
+      <button class="btn danger" id="forgetBtn" type="button">在這台裝置登出</button>
+    </div>
+    <div style="text-align:right;margin-top:16px"><button class="btn pri" id="sClose" type="button">關閉</button></div>`);
+  m.querySelector('#sClose').onclick = close;
+  m.querySelector('#sNow').onclick = () => { close(); sync(); };
+  m.querySelector('#sExport').onclick = () => {
+    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), entries: live() }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `tutorme-backup-${today()}.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  m.querySelector('#sImport').onchange = async ev => {
+    const file = ev.target.files[0]; if (!file) return;
+    try {
+      const j = JSON.parse(await file.text());
+      const list = (j.entries || []).filter(x => x && x.id && x.type);
+      S.entries = merge(S.entries, list); S.dirty = true; await saveLocal();
+      close(); toast(`已匯入 ${list.length} 筆`); render(); sync();
+    } catch { toast('檔案格式不正確'); }
+  };
+  m.querySelector('#cpBtn').onclick = async () => {
+    const a = m.querySelector('#cp1').value, b = m.querySelector('#cp2').value, er = m.querySelector('#cpErr');
+    if (a.length < 8) return er.textContent = '密碼至少 8 個字元';
+    if (a !== b) return er.textContent = '兩次輸入不一樣';
+    if (!confirm('更改後，其他裝置都要用新密碼開啟。確定嗎？')) return;
+    er.textContent = '';
+    try {
+      await pullOnly();
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const key = await deriveKey(a, salt);
+      const blob = await seal(key, salt, { entries: S.entries });
+      const res = await ghPut(blob, S.remoteSha);
+      if (res.conflict) throw new Error('剛好有其他更新，請再試一次');
+      S.remoteSha = res.sha; S.dataSalt = salt; S.dataKey = key; S.password = a; S.dirty = false;
+      const ts = crypto.getRandomValues(new Uint8Array(16));
+      ls.set(LS_TOKEN, JSON.stringify(await seal(await deriveKey(a, ts), ts, { token: S.token })));
+      await saveLocal(); close(); toast('密碼已更改'); setStatus('ok', '已同步');
+    } catch (e) { er.textContent = e.message === 'TOKEN' ? 'GitHub token 沒有寫入權限' : (e.message || '失敗'); }
+  };
+  m.querySelector('#qrBtn').onclick = () => showStudentQR(m.querySelector('#qrSlug').value);
+  m.querySelector('#ntBtn').onclick = async () => {
+    const t = m.querySelector('#nt').value.trim(); if (!t) return;
+    const old = S.token; S.token = t;
+    try { await ghGet(); } catch (e) { S.token = old; return toast(e.message === 'TOKEN' ? '這個 token 無法存取 repo' : '無法連線'); }
+    const ts = crypto.getRandomValues(new Uint8Array(16));
+    ls.set(LS_TOKEN, JSON.stringify(await seal(await deriveKey(S.password, ts), ts, { token: t })));
+    close(); toast('token 已更新'); sync();
+  };
+  m.querySelector('#forgetBtn').onclick = () => {
+    if (S.dirty && !confirm('還有沒同步的紀錄，登出後會遺失。確定嗎？')) return;
+    if (!confirm('會清除這台裝置上的 token 與暫存，下次要重新輸入 token。確定嗎？')) return;
+    ls.del(LS_TOKEN); ls.del(LS_LOCAL); showLock('已在這台裝置登出。');
+  };
+};
+
+window.addEventListener('beforeunload', ev => { if (S.formDirty) { ev.preventDefault(); ev.returnValue = ''; } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.dataKey && !S.editing) pullOnly().then(() => render()); });
+document.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.classList?.contains('entry')) ev.target.click(); });
+
+if (!window.crypto?.subtle) { $('#lockErr').textContent = '這個瀏覽器不支援加密，請改用最新版 Chrome / Safari，並用 https 開啟。'; $('#lockBtn').disabled = true; }
+function startDemo() {
+  const d = (n) => { const x = new Date(); x.setDate(x.getDate() - n); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0, 10); };
+  const t = Date.now(), who = '小安';
+  const ent = (id, type, date, lessonNo, data) => ({ id, type, student: who, date, lessonNo, data, createdAt: t, updatedAt: t });
+  const diag = { pronNotes: 'environment、opportunity 重音放錯；th 有聲無聲分不清' };
+  ['A','B','A','C','B'].forEach((a, i) => diag['A_' + (i + 1)] = a);
+  ['B','B','A','B','C'].forEach((a, i) => diag['B_' + (i + 1)] = a);
+  ['A','C','A','D','C'].forEach((a, i) => diag['C1_' + (i + 1)] = a);
+  ['B','C','D','A','A'].forEach((a, i) => diag['C2_' + (i + 1)] = a);
+  for (let i = 1; i <= 10; i++) diag['R_' + i] = [1, 2, 3, 5, 6, 7].includes(i) ? 'o' : 'x';
+  diag.diagNotes = '文法第 3、4 題錯（假設語氣、倒裝）→ 先從句型開始；單字量尚可。';
+  S.entries = [
+    ent('demo1', 'interview', d(14), 1, { q1: '上到 L3，第二次段考 11/26，範圍 L3–L5', q2: '上次段考 62 分，班上中後段', q4: '學校講義、Quizlet', q5: '以前補習班大班課，聽不懂也不敢問', q6: '平日每天約 30 分鐘', h1: '5 分，喜歡英文歌但怕文法', h2: 'Netflix 影集（中文字幕）、英文歌', h4: '抄寫十遍，大概一週就忘', h5: '先查完所有生字再讀', h6: '考前兩天才開始', h7: '文法選擇和中翻英', sa_vocab: '3', sa_grammar: '2', sa_reading: '3', sa_writing: '2', sa_listen: '3', sa_speak: '2', goal: '第二次段考 75 分以上', weakness: '文法觀念不穩、單字背了就忘', nextFocus: '假設語氣、L3 單字小考' }),
+    ent('demo2', 'diagnosis', d(14), 1, diag),
+    ent('demo3', 'lesson', d(7), 2, { duration: '90', textbook: '3', pages: 'p. 48–55', grammar: '假設語氣（與過去事實相反）', focus: '4', understand: '3', hw: '4', ask: '2', quiz: '14 / 20', good: '課文長句會先找主詞動詞了', mistakes: '假設語氣 if 子句時態常用錯（題 3、5）', errorTypes: ['文法觀念', '拼字'],
+      words: [{ w: 'environment', kind: '拼錯', note: 'enviroment' }, { w: 'recipe', kind: '聽不出來', note: '聽成 receipt' }, { w: 'affect', kind: '容易混淆', note: 'effect' }],
+      homework: 'L3 單字 1–30、假設語氣講義 10 題', nextFocus: 'L3 課文第 3–4 段、倒裝句', examDate: d(-16), examRange: 'L3 – L5', nextDate: d(0),
+      p_content: '第三課課文與假設語氣', p_highlight: '會先找主詞動詞再翻譯，長句讀得比較快了', p_improve: '假設語氣的時態', p_method: '每天 3 句「如果當時…」造句', reflection: '假設語氣用生活例子（如果昨天沒熬夜…）比較有效；單字小考時間太長，下次縮到 8 分鐘。' }),
+    ent('demo4', 'lesson', d(0), 3, { duration: '90', textbook: '3', pages: 'p. 56–60', grammar: 'Not until / Only 倒裝句', focus: '4', understand: '4', hw: '5', ask: '3', quiz: '17 / 20', good: '單字小考進步 3 分；假設語氣造句全對', mistakes: '倒裝句忘記助動詞提前', errorTypes: ['文法觀念'],
+      words: [{ w: 'renowned', kind: '新學的字', note: '' }, { w: 'opposition', kind: '難記的字', note: '' }, { w: 'restrict', kind: '認得但不會用', note: 'restrict the use of' }, { w: 'vague', kind: '忘記的字', note: '' }],
+      homework: 'L3 單字 31–60、倒裝句 8 題', nextFocus: 'L4 預習、段考模擬題', examDate: d(-16), examRange: 'L3 – L5', nextDate: d(-7),
+      p_content: '倒裝句與 L3 後半課文', p_highlight: '單字小考從 14 分進步到 17 分', p_improve: '倒裝句', p_method: '看到 Not until / Only 先圈起來，再檢查助動詞', reflection: '學生開始主動問問題了。' }),
+  ];
+  S.dataKey = 'demo'; S.password = null; S.token = null;
+  $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
+  $('#lockNowBtn').classList.add('hidden');
+  const b = document.createElement('div'); b.className = 'demo';
+  b.innerHTML = '<span><b>示範模式</b>・範例資料，可以隨意修改；重新整理就會還原，不會儲存。</span><a href="student/">學生單字本示範 →</a>';
+  $('#app').insertBefore(b, $('#app').firstChild);
+  document.title = 'TutorMe 示範';
+  go('list'); setStatus('ok', '示範模式：不會儲存');
+}
+if (DEMO) startDemo(); else showLock();
+})();
+</script>
+</body>
+</html>
