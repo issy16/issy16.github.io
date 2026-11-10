@@ -489,7 +489,7 @@ function render() {
     </div>
     <div class="sec"><span class="sq">1</span><h2>新增單字</h2></div>
     <div class="kinds">${KINDS.map(k => `<button class="kcard" type="button" data-add="${k}">${icon(k)}${k}</button>`).join('')}</div>
-    <div class="sec"><span class="sq">2</span><h2>我的單字</h2>${all.length ? '<button class="btn pri" id="quizBtn" type="button" style="margin-left:auto">隨機小考</button>' : ''}</div>
+    <div class="sec"><span class="sq">2</span><h2>我的單字</h2>${all.length ? '<span style="margin-left:auto;display:flex;gap:6px"><button class="btn" id="expBtn" type="button">匯出</button><button class="btn pri" id="quizBtn" type="button">隨機小考</button></span>' : ''}</div>
     <div class="chips">
       <button class="chip ${!f.kind ? 'on' : ''}" data-kind="">全部<small>${all.length}</small></button>
       <button class="chip ${f.kind === 'weak' ? 'on' : ''}" data-kind="weak">待加強<small>${weak}</small></button>
@@ -527,6 +527,7 @@ function render() {
   $('#q').oninput = e => { f.q = e.target.value; const p = e.target.selectionStart; render(); const q = $('#q'); q.focus(); q.setSelectionRange(p, p); };
   $('#sort').onchange = e => { f.sort = e.target.value; render(); };
   $('#quizBtn')?.addEventListener('click', openQuizSetup);
+  $('#expBtn')?.addEventListener('click', openExport);
 }
 
 /* random quiz (flashcards) */
@@ -610,6 +611,42 @@ function drawResult() {
     <div class="qbtns">${wrong.length ? '<button class="btn" id="qRetry" type="button">再考不記得的</button>' : '<span></span>'}<button class="btn pri" id="qDone" type="button">完成</button></div>`;
   el.querySelector('#qDone').onclick = () => { stopQuiz(); render(); };
   el.querySelector('#qRetry')?.addEventListener('click', () => startQuiz(shuffle(wrong)));
+}
+
+/* export */
+const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+const bookName = () => (S.profile.name ? S.profile.name + ' 的' : '') + '單字本';
+function exportCSV() {
+  const q = v => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const rows = live().sort((a, b) => (a.stars || 0) - (b.stars || 0) || a.w.localeCompare(b.w));
+  const csv = '﻿' + [['單字', '中文意思', '分類', '熟悉度（星）', '備註', '加入日期'], ...rows.map(w => [w.w, w.meaning, w.kind, w.stars || 0, w.note, w.createdAt ? new Date(w.createdAt).toLocaleDateString('zh-TW') : ''])].map(r => r.map(q).join(',')).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = `wordbook${slug ? '-' + slug : ''}-${today()}.csv`;
+  document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1500); setTimeout(() => URL.revokeObjectURL(a.href), 1500); toast('已匯出');
+}
+function printWords() {
+  const words = live().sort((a, b) => (a.stars || 0) - (b.stars || 0) || a.w.localeCompare(b.w));
+  const st = n => '★'.repeat(n || 0) + `<i>${'★'.repeat(5 - (n || 0))}</i>`;
+  const w = window.open('', '_blank'); if (!w) return toast('請允許彈出視窗後再試');
+  w.document.write(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${esc(bookName())} ${today()}</title><style>
+    @page{size:A4;margin:16mm}body{font-family:Inter,'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;color:#1d2430;font-size:12px}
+    h1{font-size:20px;margin:0 0 2px}.k{font-size:11px;color:#2b5c8a;font-weight:700}.m{color:#5b6472;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #2b5c8a}
+    table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #c9d1db;padding:5px 6px;text-align:left;vertical-align:top}th{font-size:11px;color:#5b6472}
+    .s{color:#e0a100;white-space:nowrap}.s i{color:#d5dae1;font-style:normal}tr{break-inside:avoid}</style></head><body>
+    <div class="k">TutorMe · 單字本</div><h1>${esc(bookName())}</h1><div class="m">${today().replace(/-/g, ' / ')}・共 ${words.length} 個單字・待加強 ${words.filter(x => (x.stars || 0) < 5).length} 個</div>
+    <table><tr><th>單字</th><th>中文意思</th><th>分類</th><th>熟悉度</th><th>備註</th></tr>${words.map(x => `<tr><td><b>${esc(x.w)}</b></td><td>${esc(x.meaning)}</td><td>${esc(x.kind)}</td><td class="s">${st(x.stars)}</td><td>${esc(x.note)}</td></tr>`).join('')}</table>
+    <script>setTimeout(()=>print(),300)<\/script></body></html>`);
+  w.document.close();
+}
+function openExport() {
+  const m = modal(`<h2>匯出單字本</h2>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn" id="eCsv" type="button" style="text-align:left">CSV 試算表<span class="hint" style="font-weight:400">・用 Excel、Numbers、Google 試算表打開</span></button>
+      <button class="btn" id="ePdf" type="button" style="text-align:left">列印 / 存成 PDF<span class="hint" style="font-weight:400">・在列印視窗選「儲存為 PDF」</span></button>
+    </div>
+    <div class="row"><span></span><button class="btn pri" id="eClose" type="button">關閉</button></div>`);
+  m.querySelector('#eClose').onclick = close;
+  m.querySelector('#eCsv').onclick = () => { exportCSV(); close(); };
+  m.querySelector('#ePdf').onclick = () => { printWords(); close(); };
 }
 
 /* add / edit sheet */
@@ -696,12 +733,7 @@ $('#settingsBtn').onclick = () => {
       await saveLocal(); close(); toast('密碼已更改');
     } catch (e) { er.textContent = e.message === 'TOKEN' ? '連線碼沒有權限' : (e.message || '失敗'); }
   };
-  m.querySelector('#exBtn').onclick = () => {
-    const q = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
-    const csv = '﻿單字,中文意思,分類,熟悉度,備註\n' + live().map(w => [w.w, w.meaning, w.kind, w.stars || 0, w.note].map(q).join(',')).join('\n');
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = '單字本.csv'; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  };
+  m.querySelector('#exBtn').onclick = exportCSV;
   m.querySelector('#ntBtn').onclick = async () => {
     const t = m.querySelector('#nt').value.trim(); if (!t) return;
     const old = S.token; S.token = t;

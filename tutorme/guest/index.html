@@ -576,7 +576,7 @@ function render() {
       <button class="btn pri" data-new="lesson" type="button">＋ 課後紀錄</button>
       <button class="btn" data-new="interview" type="button">＋ 開場訪談</button>
       <button class="btn" data-new="diagnosis" type="button">＋ 程度診斷</button>
-      <span style="margin-left:auto;display:flex;gap:4px"><button class="btn ghost" id="stuBtn" type="button">學生單字本</button><button class="btn ghost" id="wordsBtn" type="button">單字總表</button></span>
+      <span style="margin-left:auto;display:flex;gap:4px"><button class="btn ghost" id="stuBtn" type="button">學生單字本</button><button class="btn ghost" id="wordsBtn" type="button">單字總表</button><button class="btn ghost" id="exportBtn" type="button">匯出</button></span>
     </div>
     <div class="filters">
       <select id="fStudent" aria-label="學生"><option value="">所有學生</option>${names.map(n => `<option ${n === f.student ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
@@ -591,6 +591,7 @@ function render() {
   });
   $('#wordsBtn').onclick = showWordSummary;
   $('#stuBtn').onclick = () => go('students');
+  $('#exportBtn').onclick = showExport;
   $('#fStudent').onchange = e => { f.student = e.target.value; render(); };
   $('#fType').onchange = e => { f.type = e.target.value; render(); };
   $('#fQ').oninput = e => { f.q = e.target.value; const pos = e.target.selectionStart; render(); const q = $('#fQ'); q.focus(); q.setSelectionRange(pos, pos); };
@@ -902,7 +903,7 @@ async function openNotebook(path) {
   return { slug, ...data };
 }
 const starText = n => '★'.repeat(n || 0) + `<i>${'★'.repeat(5 - (n || 0))}</i>`;
-function notebookHtml(nb) {
+function notebookHtml(nb, idx) {
   const url = new URL('student/' + (nb.slug ? '?s=' + nb.slug : ''), location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '')).href;
   if (nb.pending) return `<div class="nb"><h3>${esc(nb.slug || '（預設）')}</h3><div class="meta">${esc(url)}</div><p style="color:var(--mute);font-size:13px;margin:0">這本單字本還沒更新成新版。請學生打開單字本、輸入密碼一次，之後就會出現在這裡。</p></div>`;
   const words = (nb.words || []).filter(w => !w.deleted);
@@ -912,7 +913,8 @@ function notebookHtml(nb) {
   const last = words.reduce((m, w) => Math.max(m, w.updatedAt || 0), 0);
   const rows = words.slice().sort((a, b) => (a.stars || 0) - (b.stars || 0) || (b.createdAt || 0) - (a.createdAt || 0));
   return `<div class="nb">
-    <h3>${esc(nb.profile?.name || nb.slug || '學生')} 的單字本</h3>
+    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start"><h3>${esc(nb.profile?.name || nb.slug || '學生')} 的單字本</h3>
+    ${idx === undefined || !rows.length ? '' : `<span style="display:flex;gap:6px"><button class="btn" type="button" data-nbcsv="${idx}">匯出 CSV</button><button class="btn" type="button" data-nbprint="${idx}">列印 / PDF</button></span>`}</div>
     <div class="meta">${last ? '最後更新 ' + new Date(last).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) + '・' : ''}${esc(url)}</div>
     <div class="st"><span>單字 <b>${words.length}</b></span><span>平均熟悉度 <b>${avg}</b> ★</span><span>待加強（未滿 5★）<b>${weak.length}</b></span></div>
     ${rows.length ? `<table><tr><th>單字</th><th>意思</th><th>分類</th><th>熟悉度</th><th>備註</th></tr>${rows.map(w =>
@@ -925,16 +927,109 @@ async function renderStudents() {
   $('#stBack').onclick = () => go('list');
   $('#stReload').onclick = () => renderStudents();
   const box = $('#nbs');
-  if (DEMO) { box.innerHTML = notebookHtml(DEMO_NOTEBOOK) + '<p style="font-size:12px;color:var(--mute)">示範資料。正式版會自動列出每位學生的單字本（唯讀）。</p>'; return; }
+  box.onclick = e => {
+    const c = e.target.closest('[data-nbcsv]'), p = e.target.closest('[data-nbprint]');
+    if (c) exportNotebookCSV([S.notebooks[+c.dataset.nbcsv]]);
+    if (p) printNotebook(S.notebooks[+p.dataset.nbprint]);
+  };
+  if (DEMO) { S.notebooks = [DEMO_NOTEBOOK]; box.innerHTML = notebookHtml(DEMO_NOTEBOOK, 0) + '<p style="font-size:12px;color:var(--mute)">示範資料。正式版會自動列出每位學生的單字本（唯讀）。</p>'; return; }
   if (!S.keys) { box.innerHTML = '<p style="color:var(--mute)">正在建立老師金鑰，請稍候再按「重新整理」。</p>'; ensureTeacherKey(); return; }
   try {
     const paths = await listNotebooks();
     if (!paths.length) { box.innerHTML = '<div class="empty">還沒有學生單字本。在「設定 → 學生連線 QR」讓學生掃描後建立。</div>'; return; }
     const nbs = await Promise.all(paths.map(p => openNotebook(p).catch(() => ({ slug: p, error: true }))));
     if (S.view !== 'students') return;
-    box.innerHTML = nbs.filter(Boolean).map(nb => nb.error ? `<div class="nb"><h3>${esc(nb.slug)}</h3><p style="color:var(--bad);font-size:13px;margin:0">無法開啟。這本可能是在老師金鑰更換前建立的，請學生打開單字本一次。</p></div>` : notebookHtml(nb)).join('')
+    S.notebooks = nbs.filter(Boolean);
+    box.innerHTML = S.notebooks.map((nb, i) => nb.error ? `<div class="nb"><h3>${esc(nb.slug)}</h3><p style="color:var(--bad);font-size:13px;margin:0">無法開啟。這本可能是在老師金鑰更換前建立的，請學生打開單字本一次。</p></div>` : notebookHtml(nb, nb.pending ? undefined : i)).join('')
       + '<p style="font-size:12px;color:var(--mute)">唯讀。學生在自己的單字本修改後，按「重新整理」就會看到。</p>';
   } catch (e) { box.innerHTML = `<p style="color:var(--bad)">${e.message === 'TOKEN' ? 'GitHub token 沒有權限' : '無法連線'}</p>`; }
+}
+
+/* ---------------- export ---------------- */
+function downloadCSV(name, header, rows) {
+  const q = v => { const s = Array.isArray(v) ? v.join('、') : String(v ?? ''); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const csv = '﻿' + [header, ...rows].map(r => r.map(q).join(',')).join('\r\n'); // BOM so Excel reads Chinese correctly
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = name + '.csv'; document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1500);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1500); toast('已匯出 ' + a.download);
+}
+const fmtWords = ws => (ws || []).filter(w => (w.w || '').trim()).map(w => `${w.w.trim()}（${w.kind}${w.note ? '：' + w.note : ''}）`).join('、');
+function exportEntriesCSV(rows) {
+  const header = ['日期', '第幾堂', '學生', '類型', '課本進度', '頁數', '文法 / 句型', '上課分鐘', '專注度', '理解程度', '作業完成', '主動發問', '單字小考', '做得好的地方', '常錯的地方', '錯誤類型', '單字紀錄',
+    '回家作業', '下堂課重點', '下次段考', '段考範圍', '下次上課', '給學生的回饋', '教學反思', '訪談目標', '主要弱點', '診斷總分', '診斷單字', '診斷文法', '診斷發音', '診斷重音', '診斷朗讀', '老師補充'];
+  const out = rows.map(e => {
+    const d = e.data || {}; const sc = e.type === 'diagnosis' ? scoreDiagnosis(d) : null;
+    const prevEditing = S.editing; S.editing = e; const msg = e.type === 'lesson' ? studentMessage() : ''; S.editing = prevEditing;
+    return [e.date, e.lessonNo, e.student, TYPES[e.type]?.label || e.type, d.textbook ? 'Lesson ' + d.textbook : '', d.pages, d.grammar, d.duration, d.focus, d.understand, d.hw, d.ask, d.quiz, d.good, d.mistakes, d.errorTypes, fmtWords(d.words),
+      d.homework, d.nextFocus, d.examDate, d.examRange, d.nextDate, msg, d.reflection, d.goal, d.weakness, sc?.total, sc?.A, sc?.B, sc?.C1, sc?.C2, sc?.C3, d.diagNotes || d.pronNotes];
+  });
+  downloadCSV(`tutorme-lessons-${today()}`, header, out);
+}
+function exportWordSummaryCSV(items, student) {
+  downloadCSV(`tutorme-word-summary-${today()}`, ['單字', '分類', '出錯次數', '備註', '日期'],
+    items.map(x => [x.w, x.kind, x.dates.length, x.notes, x.dates.join('、')]));
+}
+function exportNotebookCSV(nbs) {
+  const rows = [];
+  for (const nb of nbs) for (const w of (nb.words || []).filter(w => !w.deleted))
+    rows.push([nb.profile?.name || nb.slug || '學生', w.w, w.meaning, w.kind, w.stars || 0, w.note, w.createdAt ? new Date(w.createdAt).toLocaleDateString('zh-TW') : '']);
+  const one = nbs.length === 1 && nbs[0].slug ? '-' + nbs[0].slug : '';
+  downloadCSV(`tutorme-notebook${one}-${today()}`, ['學生', '單字', '中文意思', '分類', '熟悉度（星）', '備註', '加入日期'], rows);
+}
+function printNotebook(nb) {
+  const words = (nb.words || []).filter(w => !w.deleted).sort((a, b) => (a.stars || 0) - (b.stars || 0) || a.w.localeCompare(b.w));
+  const name = nb.profile?.name || nb.slug || '學生';
+  const w = window.open('', '_blank'); if (!w) return toast('請允許彈出視窗後再試');
+  w.document.write(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${esc(name)} 的單字本 ${today()}</title><style>
+    @page{size:A4;margin:16mm}body{font-family:Inter,'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;color:#1d2430;font-size:12px}
+    h1{font-size:20px;margin:0 0 2px}.k{font-size:11px;color:#2b5c8a;font-weight:700}.m{color:#5b6472;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #2b5c8a}
+    table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #c9d1db;padding:5px 6px;text-align:left;vertical-align:top}th{font-size:11px;color:#5b6472}
+    .s{color:#e0a100;white-space:nowrap}.s i{color:#d5dae1;font-style:normal}tr{break-inside:avoid}</style></head><body>
+    <div class="k">TutorMe · 單字本</div><h1>${esc(name)} 的單字本</h1><div class="m">${today().replace(/-/g, ' / ')}・共 ${words.length} 個單字・待加強 ${words.filter(x => (x.stars || 0) < 5).length} 個</div>
+    <table><tr><th>單字</th><th>中文意思</th><th>分類</th><th>熟悉度</th><th>備註</th></tr>${words.map(x => `<tr><td><b>${esc(x.w)}</b></td><td>${esc(x.meaning)}</td><td>${esc(x.kind)}</td><td class="s">${starText(x.stars)}</td><td>${esc(x.note)}</td></tr>`).join('')}</table>
+    <script>setTimeout(()=>print(),300)<\/script></body></html>`);
+  w.document.close();
+}
+function showExport() {
+  const f = S.filter;
+  let rows = live().sort(byDateDesc);
+  if (f.student) rows = rows.filter(e => e.student === f.student);
+  if (f.type) rows = rows.filter(e => e.type === f.type);
+  if (f.q) { const q = f.q.toLowerCase(); rows = rows.filter(e => JSON.stringify(e).toLowerCase().includes(q)); }
+  const filtered = f.student || f.type || f.q;
+  const m = modal(`<h2>匯出</h2>
+    <p style="font-size:13px;color:var(--mute);margin:0 0 12px">CSV 可以直接用 Excel、Numbers 或 Google 試算表打開。</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn" id="exLog" type="button" style="text-align:left">上課紀錄（CSV）<span class="note" style="font-weight:400;color:var(--mute)">・${rows.length} 筆${filtered ? '，套用目前篩選' : ''}</span></button>
+      <button class="btn" id="exWords" type="button" style="text-align:left">單字總表（CSV）<span class="note" style="font-weight:400;color:var(--mute)">・課後紀錄裡的單字${f.student ? '，只有 ' + esc(f.student) : ''}</span></button>
+      <button class="btn" id="exNb" type="button" style="text-align:left">學生單字本（CSV）<span class="note" style="font-weight:400;color:var(--mute)">・所有學生的單字與星星</span></button>
+      <button class="btn" id="exJson" type="button" style="text-align:left">完整備份（JSON）<span class="note" style="font-weight:400;color:var(--mute)">・未加密，可在「設定」匯入還原</span></button>
+    </div>
+    <div style="text-align:right;margin-top:16px"><button class="btn pri" id="exClose" type="button">關閉</button></div>`);
+  m.querySelector('#exClose').onclick = close;
+  m.querySelector('#exLog').onclick = () => rows.length ? exportEntriesCSV(rows) : toast('沒有紀錄可以匯出');
+  m.querySelector('#exWords').onclick = () => {
+    const map = new Map();
+    for (const e of live().filter(e => e.type === 'lesson' && (!f.student || e.student === f.student)).sort(byDateDesc)) for (const w of (e.data.words || [])) {
+      const word = (w.w || '').trim(); if (!word) continue; const key = w.kind + '|' + word.toLowerCase();
+      const it = map.get(key) || { w: word, kind: w.kind, notes: [], dates: [] };
+      if (w.note && !it.notes.includes(w.note.trim())) it.notes.push(w.note.trim()); it.dates.push(e.date); map.set(key, it);
+    }
+    map.size ? exportWordSummaryCSV([...map.values()], f.student) : toast('還沒有單字紀錄');
+  };
+  m.querySelector('#exNb').onclick = async () => {
+    try {
+      let nbs;
+      if (DEMO) nbs = [DEMO_NOTEBOOK];
+      else { if (!S.keys) return toast('老師金鑰還在建立，請稍後再試'); nbs = (await Promise.all((await listNotebooks()).map(p => openNotebook(p).catch(() => null)))).filter(nb => nb && !nb.pending); }
+      nbs.length ? exportNotebookCSV(nbs) : toast('還沒有可以匯出的學生單字本');
+    } catch { toast('無法連線'); }
+  };
+  m.querySelector('#exJson').onclick = () => {
+    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), entries: live() }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `tutorme-backup-${today()}.json`; document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1500);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+  };
 }
 
 /* ---------------- word summary ---------------- */
@@ -960,10 +1055,11 @@ function showWordSummary() {
     </div>
     <p style="font-size:12px;color:var(--mute)">×2 以上表示在不同堂課重複出錯，優先複習。篩選學生後再開啟，可以只看那位學生。</p>
     <div style="display:flex;justify-content:space-between;gap:8px;margin-top:12px">
-      <button class="btn" id="wCopy" type="button" ${total ? '' : 'disabled'}>複製清單</button>
+      <span style="display:flex;gap:8px"><button class="btn" id="wCopy" type="button" ${total ? '' : 'disabled'}>複製清單</button><button class="btn" id="wCsv" type="button" ${total ? '' : 'disabled'}>匯出 CSV</button></span>
       <button class="btn pri" id="wClose" type="button">關閉</button>
     </div>`);
   m.querySelector('#wClose').onclick = close;
+  m.querySelector('#wCsv').onclick = () => exportWordSummaryCSV([...map.values()], f.student);
   m.querySelector('#wCopy').onclick = async () => { try { await navigator.clipboard.writeText(text); toast('已複製'); } catch { toast('無法自動複製'); } };
 }
 
