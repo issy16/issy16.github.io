@@ -110,6 +110,12 @@ textarea{min-height:60px;resize:vertical}
 .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border:1px solid var(--line);border-radius:14px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;box-shadow:0 2px 10px rgba(29,36,48,.06)}
 .face.b{transform:rotateY(180deg);background:var(--panel)}
 .face .big{font-size:clamp(30px,9vw,46px);font-weight:700;word-break:break-word;line-height:1.15}
+.spk{border:1px solid var(--line);background:#fff;border-radius:999px;width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--main);flex:none}
+.spk svg{width:22px;height:22px}
+.spk.sm{width:30px;height:30px}.spk.sm svg{width:16px;height:16px}
+.ipa{font-family:'Lucida Sans Unicode','Arial Unicode MS','Segoe UI','Noto Sans',sans-serif;color:var(--opt);font-size:17px;margin-top:6px}
+.ipa b{color:var(--main)}
+.word .ipa{font-size:13px;margin:0 0 0 6px;display:inline}
 .face .mean{font-size:clamp(22px,6vw,30px);font-weight:700;margin-top:10px}
 .face .hint2{position:absolute;bottom:14px;left:0;right:0;font-size:13px;color:var(--mute)}
 .qbtns{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:520px;width:100%;margin:12px auto 0}
@@ -505,11 +511,11 @@ function render() {
     </div>
     ${rows.length ? rows.map(w => `<div class="word">
       <div class="main" data-edit="${esc(w.id)}" role="button" tabindex="0">
-        <div><span class="w">${esc(w.w)}</span><span class="tag">${icon(w.kind)}${esc(w.kind)}</span></div>
+        <div><span class="w">${esc(w.w)}</span>${w.ipa ? `<span class="ipa">${ipaHtml(w.ipa)}</span>` : ''}<span class="tag">${icon(w.kind)}${esc(w.kind)}</span></div>
         ${w.meaning ? `<div class="m">${esc(w.meaning)}</div>` : ''}
         ${w.note ? `<div class="n">${esc(w.note)}</div>` : ''}
       </div>
-      ${starsHtml(w.stars, w.id)}
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">${starsHtml(w.stars, w.id)}<button class="spk sm" type="button" data-sayid="${esc(w.id)}" aria-label="播放 ${esc(w.w)} 的發音">${SPK}</button></div>
     </div>`).join('') : `<div class="empty">${all.length ? '沒有符合的單字' : '還沒有單字。點上面的分類，新增第一個單字。'}</div>`}
   `;
   const v = $('#view');
@@ -527,7 +533,47 @@ function render() {
   $('#q').oninput = e => { f.q = e.target.value; const p = e.target.selectionStart; render(); const q = $('#q'); q.focus(); q.setSelectionRange(p, p); };
   $('#sort').onchange = e => { f.sort = e.target.value; render(); };
   $('#quizBtn')?.addEventListener('click', openQuizSetup);
+  v.querySelectorAll('[data-sayid]').forEach(b => b.onclick = () => speak(S.words.find(x => x.id === b.dataset.sayid)));
   $('#expBtn')?.addEventListener('click', openExport);
+}
+
+/* pronunciation: device voice + dictionary phonetics (ˈ = primary stress, ˌ = secondary) */
+const SPK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></svg>';
+let VOICE = null;
+function pickVoice() {
+  const vs = speechSynthesis.getVoices(); if (!vs.length) return null;
+  return vs.find(v => /en[-_]US/i.test(v.lang) && /Samantha|Google US|Aria|Jenny/i.test(v.name)) || vs.find(v => /en[-_]US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
+}
+if ('speechSynthesis' in window) { VOICE = pickVoice(); speechSynthesis.onvoiceschanged = () => { VOICE = pickVoice(); }; }
+const audioCache = {};
+function speak(w) {
+  if (!w) return;
+  if (w.audio) { try { const a = audioCache[w.audio] ||= new Audio(w.audio); a.currentTime = 0; a.play().catch(() => tts(w.w)); return; } catch {} }
+  tts(w.w);
+}
+function tts(text) {
+  if (!('speechSynthesis' in window)) return toast('這個瀏覽器不支援發音');
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = 0.85; if (VOICE) u.voice = VOICE;
+  speechSynthesis.speak(u);
+}
+async function lookupPron(word) {
+  const q = word.trim().toLowerCase(); if (!q || /\s/.test(q) && q.split(/\s+/).length > 3) return null;
+  try {
+    const r = await fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(q));
+    if (!r.ok) return null;
+    const ph = (await r.json()).flatMap(e => [...(e.phonetics || []), { text: e.phonetic }]).filter(p => p && (p.text || p.audio));
+    const us = ph.find(p => p.text && /-us\./.test(p.audio || '')) || ph.find(p => p.text && p.audio) || ph.find(p => p.text);
+    const audio = (ph.find(p => /-us\./.test(p.audio || '')) || ph.find(p => p.audio))?.audio || '';
+    return { ipa: us?.text ? ('/' + us.text.replace(/^[\/\[]|[\/\]]$/g, '') + '/') : '', audio };
+  } catch { return null; }
+}
+const ipaHtml = s => esc(s || '').replace(/ˈ([^ˈˌ.\/\s]+)/g, 'ˈ<b>$1</b>');
+async function ensurePron(w) {
+  if (!w || w.pronChecked || DEMO) return;
+  const p = await lookupPron(w.w);
+  w.pronChecked = true;
+  if (p && (p.ipa || p.audio)) { if (!w.ipa) w.ipa = p.ipa; if (!w.audio) w.audio = p.audio; w.updatedAt = Date.now(); changed(); }
 }
 
 /* random quiz (flashcards) */
@@ -563,6 +609,7 @@ function quizKeys(e) {
   if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (QZ.i < QZ.deck.length) flipCard(); }
   else if (QZ.flipped && (e.key === 'ArrowRight' || e.key === 'k')) answer(true);
   else if (QZ.flipped && (e.key === 'ArrowLeft' || e.key === 'j')) answer(false);
+  else if (e.key === 's' || e.key === 'S') speak(S.words.find(x => x.id === QZ.deck[QZ.i]));
   else if (e.key === 'Escape') stopQuiz();
 }
 function drawCard() {
@@ -574,8 +621,9 @@ function drawCard() {
   el.innerHTML = `<div class="qtop"><button class="btn ghost" id="qExit" type="button">✕ 結束</button><div class="prog"><div style="width:${QZ.i / total * 100}%"></div></div><span class="hint">${QZ.i + 1} / ${total}</span></div>
     <div class="flip" id="card" role="button" tabindex="0" aria-label="點一下翻面">
       <div class="in">
-        <div class="face"><span class="tag" style="margin:0 0 14px">${icon(w.kind)}${esc(w.kind)}</span><div class="big">${esc(w.w)}</div><div class="hint2">點一下看中文</div></div>
-        <div class="face b"><div class="big" style="font-size:clamp(22px,6vw,30px);color:var(--mute)">${esc(w.w)}</div>
+        <div class="face"><div class="big">${esc(w.w)}</div><button class="spk" type="button" data-say style="margin-top:18px" aria-label="播放發音">${SPK}</button><div class="hint2">點一下看中文</div></div>
+        <div class="face b"><div style="display:flex;align-items:center;gap:10px;justify-content:center"><div class="big" style="font-size:clamp(22px,6vw,30px);color:var(--mute)">${esc(w.w)}</div><button class="spk sm" type="button" data-say aria-label="播放發音">${SPK}</button></div>
+          <div class="ipa" id="cardIpa">${ipaHtml(w.ipa)}</div>
           <div class="mean">${w.meaning ? esc(w.meaning) : '<span style="color:var(--mute);font-size:16px;font-weight:400">（還沒寫中文意思）</span>'}</div>
           ${w.note ? `<div class="hint" style="margin-top:10px;font-size:14px">${esc(w.note)}</div>` : ''}
           <div style="margin-top:16px">${starsHtml(w.stars, null, true)}</div></div>
@@ -583,7 +631,8 @@ function drawCard() {
     </div>
     <div class="qbtns" id="qBtns" style="visibility:hidden"><button class="btn no" id="qNo" type="button">✗ 不記得</button><button class="btn yes" id="qYes" type="button">✓ 記得</button></div>`;
   el.querySelector('#qExit').onclick = () => { if (QZ.i === 0 || confirm('結束這次小考？已經作答的星星會保留。')) stopQuiz(); };
-  el.querySelector('#card').onclick = flipCard;
+  el.querySelector('#card').onclick = e => { if (e.target.closest('[data-say]')) { e.stopPropagation(); speak(w); return; } flipCard(); };
+  if (!w.ipa && !w.pronChecked) ensurePron(w).then(() => { const ip = $('#cardIpa'); if (ip && QZ.deck[QZ.i] === w.id) ip.innerHTML = ipaHtml(w.ipa); });
   el.querySelector('#qNo').onclick = () => answer(false);
   el.querySelector('#qYes').onclick = () => answer(true);
 }
@@ -619,7 +668,7 @@ const bookName = () => (S.profile.name ? S.profile.name + ' 的' : '') + '單字
 function exportCSV() {
   const q = v => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const rows = live().sort((a, b) => (a.stars || 0) - (b.stars || 0) || a.w.localeCompare(b.w));
-  const csv = '﻿' + [['單字', '中文意思', '分類', '熟悉度（星）', '備註', '加入日期'], ...rows.map(w => [w.w, w.meaning, w.kind, w.stars || 0, w.note, w.createdAt ? new Date(w.createdAt).toLocaleDateString('zh-TW') : ''])].map(r => r.map(q).join(',')).join('\r\n');
+  const csv = '﻿' + [['單字', '發音', '中文意思', '分類', '熟悉度（星）', '備註', '加入日期'], ...rows.map(w => [w.w, w.ipa, w.meaning, w.kind, w.stars || 0, w.note, w.createdAt ? new Date(w.createdAt).toLocaleDateString('zh-TW') : ''])].map(r => r.map(q).join(',')).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = `wordbook${slug ? '-' + slug : ''}-${today()}.csv`;
   document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1500); setTimeout(() => URL.revokeObjectURL(a.href), 1500); toast('已匯出');
 }
@@ -662,6 +711,8 @@ function openSheet(w) {
   const m = modal(`<h2>${icon(cur.kind)}${isNew ? '新增：' : ''}${esc(cur.kind)}</h2>
     <form id="wf" autocomplete="off">
       <div class="field"><label for="ww">單字</label><input id="ww" type="text" value="${esc(cur.w)}" autocapitalize="off" autocorrect="off" spellcheck="false" required></div>
+      <div class="field"><label for="wi">發音 / 重音</label><div style="display:flex;gap:6px"><input id="wi" type="text" value="${esc(cur.ipa)}" placeholder="打完單字會自動查詢，例：/ɪnˈvaɪrənmənt/" autocapitalize="off" spellcheck="false" style="font-family:'Lucida Sans Unicode','Arial Unicode MS','Segoe UI',sans-serif"><button class="spk sm" type="button" id="wSay" aria-label="播放發音" style="width:40px;height:40px">${SPK}</button></div>
+        <span class="hint">ˈ 後面的音節是重音；也可以自己寫，例：en-VI-ron-ment</span></div>
       <div class="field"><label for="wm">中文意思</label><input id="wm" type="text" value="${esc(cur.meaning)}"></div>
       <div class="field"><label for="wn">備註</label><input id="wn" type="text" value="${esc(cur.note)}" placeholder="${NOTE_PH[cur.kind] || '例句、提醒…'}"></div>
       <div class="field"><label for="wk">分類</label><select id="wk">${KINDS.map(k => `<option ${k === cur.kind ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
@@ -671,6 +722,22 @@ function openSheet(w) {
         <div style="display:flex;gap:8px">${isNew ? '<button class="btn" type="button" id="wMore">儲存並再新增</button>' : ''}<button class="btn pri" type="submit">儲存</button></div>
       </div>
     </form>`);
+  const wwIn = m.querySelector('#ww'), wiIn = m.querySelector('#wi');
+  let looked = '';
+  const autoPron = async () => {
+    const word = wwIn.value.trim(); if (!word || word === looked) return; looked = word;
+    if (wiIn.value.trim() && word === cur.w) return;
+    wiIn.placeholder = '查詢中…';
+    const p = await lookupPron(word);
+    if (wwIn.value.trim() !== word) return;
+    wiIn.placeholder = p?.ipa ? '' : '查不到，可以自己寫，例：en-VI-ron-ment';
+    if (p?.ipa && (!wiIn.value.trim() || wiIn.dataset.auto)) { wiIn.value = p.ipa; wiIn.dataset.auto = '1'; }
+    cur.audio = p?.audio || ''; cur.pronChecked = true;
+  };
+  wwIn.addEventListener('blur', autoPron);
+  wwIn.addEventListener('input', () => { clearTimeout(wwIn._t); wwIn._t = setTimeout(autoPron, 900); });
+  wiIn.addEventListener('input', () => { delete wiIn.dataset.auto; });
+  m.querySelector('#wSay').onclick = () => speak({ w: wwIn.value.trim(), audio: wwIn.value.trim() === looked || wwIn.value.trim() === cur.w ? cur.audio : '' });
   const ws = m.querySelector('#ws');
   ws.addEventListener('click', e => {
     const b = e.target.closest('[data-star]'); if (!b) return;
@@ -682,7 +749,8 @@ function openSheet(w) {
     const word = m.querySelector('#ww').value.trim();
     if (!word) { m.querySelector('#ww').focus(); return; }
     const now = Date.now();
-    const rec = { ...cur, id: cur.id || uid(), w: word, meaning: m.querySelector('#wm').value.trim(), note: m.querySelector('#wn').value.trim(), createdAt: cur.createdAt || now, updatedAt: now };
+    if (word !== cur.w && word !== looked) { cur.audio = ''; cur.pronChecked = false; }
+    const rec = { ...cur, id: cur.id || uid(), w: word, ipa: m.querySelector('#wi').value.trim(), meaning: m.querySelector('#wm').value.trim(), note: m.querySelector('#wn').value.trim(), createdAt: cur.createdAt || now, updatedAt: now };
     const i = S.words.findIndex(x => x.id === rec.id);
     if (i >= 0) S.words[i] = rec; else S.words.push(rec);
     render(); changed();
@@ -756,10 +824,10 @@ document.addEventListener('visibilitychange', async () => {
 if (!window.crypto?.subtle) { $('#lockErr').textContent = '這個瀏覽器不支援，請用最新版 Chrome 或 Safari 開啟。'; $('#lockBtn').disabled = true; }
 function startDemo() {
   const t = Date.now();
-  const W = [['environment','環境','拼錯','我寫成 enviroment',2],['recipe','食譜','聽不出來','我聽成 receipt',3],['affect','影響（動詞）','容易混淆','和 effect 搞混',1],
-    ['renowned','有名的','新學的字','be renowned for',4],['opposition','反對','難記的字','',2],['restrict','限制','認得但不會用','restrict the use of',3],
-    ['vague','含糊的','忘記的字','',1],['debt','債務','聽不出來','b 不發音',5],['opportunity','機會','拼錯','oppor-tu-ni-ty',4],['abandon','放棄','不會的字','',0]];
-  S.words = W.map(([w, meaning, kind, note, stars], i) => ({ id: 'd' + i, w, meaning, kind, note, stars, createdAt: t - i * 3600e3, updatedAt: t }));
+  const W = [['environment','環境','拼錯','我寫成 enviroment',2,'/ɪnˈvaɪrənmənt/'],['recipe','食譜','聽不出來','我聽成 receipt',3,'/ˈrɛsəpi/'],['affect','影響（動詞）','容易混淆','和 effect 搞混',1,'/əˈfɛkt/'],
+    ['renowned','有名的','新學的字','be renowned for',4,'/rɪˈnaʊnd/'],['opposition','反對','難記的字','',2,'/ˌɑpəˈzɪʃən/'],['restrict','限制','認得但不會用','restrict the use of',3,'/rɪˈstrɪkt/'],
+    ['vague','含糊的','忘記的字','',1,'/veɪɡ/'],['debt','債務','聽不出來','b 不發音',5,'/dɛt/'],['opportunity','機會','拼錯','',4,'/ˌɑpərˈtunəti/'],['abandon','放棄','不會的字','',0,'/əˈbændən/']];
+  S.words = W.map(([w, meaning, kind, note, stars, ipa], i) => ({ id: 'd' + i, w, meaning, kind, note, stars, ipa, pronChecked: true, createdAt: t - i * 3600e3, updatedAt: t }));
   S.profile = { name: '小安', updatedAt: t }; S.dataKey = 'demo';
   $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
   $('#lockNowBtn').classList.add('hidden');
