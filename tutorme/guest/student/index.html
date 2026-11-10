@@ -95,6 +95,11 @@ textarea{min-height:60px;resize:vertical}
 .modal h2 svg{width:20px;height:20px;color:var(--opt)}
 .row{display:flex;justify-content:space-between;gap:8px;margin-top:16px}
 .demo{background:#fff6e0;border:1px solid #f0d58a;color:#6b4d00;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}.demo a{color:var(--main);font-weight:700;text-decoration:none}
+.scan{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;background:var(--main-soft);border-color:var(--main);color:var(--main);font-size:15px}
+.scan svg{width:22px;height:22px}
+.cam{position:relative;width:100%;aspect-ratio:1/1;background:#000;border-radius:8px;overflow:hidden}
+.cam video{width:100%;height:100%;object-fit:cover;display:block}
+.cam .frame{position:absolute;inset:18%;border:3px solid rgba(255,255,255,.9);border-radius:12px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:6px;font-size:14px;z-index:20}
 </style>
 </head>
@@ -120,9 +125,11 @@ textarea{min-height:60px;resize:vertical}
         <span class="hint">密碼無法找回，忘記就打不開。請記好，也可以告訴老師。</span>
       </div>
       <div class="field hidden" id="tokWrap">
-        <label for="tok">連線碼（老師輸入）</label>
-        <input id="tok" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="github_pat_…">
-        <span class="hint">或請老師在 TutorMe「設定 → 學生連線 QR」顯示 QR code，用這台裝置的相機掃描。</span>
+        <button class="btn scan" id="scanBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M7 12h10"/></svg>掃描老師的 QR code</button>
+        <span class="hint">老師在 TutorMe「設定 → 學生連線 QR」打開 QR code，按上面的按鈕對準掃描。</span>
+        <details style="margin-top:6px"><summary class="hint" style="cursor:pointer">或手動輸入連線碼</summary>
+          <input id="tok" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" placeholder="github_pat_…" aria-label="連線碼" style="margin-top:6px">
+        </details>
       </div>
       <div class="hint hidden" id="qrOk" style="color:var(--ok);font-weight:600;margin-bottom:10px">✓ 已透過 QR code 連線</div>
       <div class="err" id="lockErr"></div>
@@ -282,6 +289,71 @@ function showLock(msg) {
   $('#lockBtn').textContent = '開啟'; $('#lockErr').textContent = msg || '';
   setTimeout(() => $('#pw').focus(), 0);
 }
+/* in-page QR scanner */
+function loadJsQR() {
+  if (window.jsQR) return Promise.resolve();
+  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'; s.onload = res; s.onerror = () => rej(new Error('掃描工具載入失敗，請檢查網路')); document.head.appendChild(s); });
+}
+function handleScanned(text) {
+  let u; try { u = new URL(text); } catch { return false; }
+  const k = new URLSearchParams(u.hash.slice(1)).get('k');
+  if (!k || !/\/student\/?$/.test(u.pathname)) return false;
+  const theirSlug = (u.searchParams.get('s') || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+  if (theirSlug !== slug || u.origin !== location.origin) { location.href = u.href; return true; } // QR is for a different notebook: go there
+  PENDING = k;
+  $('#tokWrap').classList.add('hidden'); $('#qrOk').classList.remove('hidden'); $('#lockErr').textContent = '';
+  $('#lockSub').textContent = '輸入你的密碼。第一次使用會請你設定新密碼。';
+  setTimeout(() => $('#pw').focus(), 50);
+  return true;
+}
+let camStream = null, camTimer = null;
+function stopCam() { clearInterval(camTimer); camTimer = null; if (camStream) camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+async function openScanner() {
+  const m = modal(`<h2>掃描老師的 QR code</h2>
+    <div class="cam"><video id="camV" playsinline muted autoplay></video><div class="frame"></div></div>
+    <p class="hint" id="camMsg" style="margin:10px 0 0">把 QR code 對準框框…</p>
+    <div class="row"><span></span><button class="btn" id="camClose" type="button">取消</button></div>`);
+  const done = () => { stopCam(); close(); };
+  m.querySelector('#camClose').onclick = done;
+  m.addEventListener('click', e => { if (e.target.id === 'mdl') stopCam(); });
+  const msg = t => { const el = m.querySelector('#camMsg'); if (el) el.textContent = t; };
+  if (!navigator.mediaDevices?.getUserMedia) { msg('這個瀏覽器不能開相機。請改用手機內建相機掃描，或手動輸入連線碼。'); return; }
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+  } catch (e) {
+    msg(e.name === 'NotAllowedError' ? '沒有相機權限。請在瀏覽器設定允許這個網站使用相機，再試一次。' : '無法開啟相機：' + (e.message || e.name)); return;
+  }
+  const v = m.querySelector('#camV'); v.srcObject = camStream; try { await v.play(); } catch {}
+  let detect;
+  if ('BarcodeDetector' in window) {
+    try { const bd = new BarcodeDetector({ formats: ['qr_code'] }); detect = async () => (await bd.detect(v))[0]?.rawValue; } catch {}
+  }
+  if (!detect) {
+    try { await loadJsQR(); } catch (e) { msg(e.message); return; }
+    const c = document.createElement('canvas'), ctx = c.getContext('2d', { willReadFrequently: true });
+    detect = async () => {
+      if (!v.videoWidth) return null;
+      const s = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight));
+      c.width = Math.round(v.videoWidth * s); c.height = Math.round(v.videoHeight * s);
+      ctx.drawImage(v, 0, 0, c.width, c.height);
+      const r = jsQR(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height, { inversionAttempts: 'dontInvert' });
+      return r?.data;
+    };
+  }
+  let busy = false;
+  camTimer = setInterval(async () => {
+    if (busy || !camStream) return; busy = true;
+    try {
+      const text = await detect();
+      if (text) {
+        if (handleScanned(text)) { done(); toast('已連線'); }
+        else msg('這不是 TutorMe 的連線 QR code，請老師重新打開。');
+      }
+    } catch {} finally { busy = false; }
+  }, 250);
+}
+$('#scanBtn').onclick = openScanner;
+
 $('#lockForm').addEventListener('submit', async ev => {
   ev.preventDefault();
   const pw = $('#pw').value, err = $('#lockErr'), btn = $('#lockBtn');
