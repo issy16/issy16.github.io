@@ -418,9 +418,9 @@ function render() {
   const all = live(), f = S.filter;
   const rated = all.filter(w => w.stars);
   const avg = rated.length ? (rated.reduce((t, w) => t + w.stars, 0) / rated.length).toFixed(1) : '—';
-  const weak = all.filter(w => (w.stars || 0) <= 2).length;
+  const weak = all.filter(w => (w.stars || 0) < 5).length;
   let rows = all;
-  if (f.kind === 'weak') rows = rows.filter(w => (w.stars || 0) <= 2);
+  if (f.kind === 'weak') rows = rows.filter(w => (w.stars || 0) < 5);
   else if (f.kind) rows = rows.filter(w => w.kind === f.kind);
   if (f.q) { const q = f.q.toLowerCase(); rows = rows.filter(w => [w.w, w.meaning, w.note].join(' ').toLowerCase().includes(q)); }
   rows = rows.slice().sort(
@@ -433,7 +433,7 @@ function render() {
     <div class="stats">
       <div><div class="k">單字</div><div class="v">${all.length}</div></div>
       <div><div class="k">平均熟悉度</div><div class="v">${avg}${avg !== '—' ? '<span style="color:var(--star);font-size:16px"> ★</span>' : ''}</div></div>
-      <div><div class="k">待加強（≤2★）</div><div class="v">${weak}</div></div>
+      <div><div class="k">待加強（未滿 5★）</div><div class="v">${weak}</div></div>
     </div>
     <div class="sec"><span class="sq">1</span><h2>新增單字</h2></div>
     <div class="kinds">${KINDS.map(k => `<button class="kcard" type="button" data-add="${k}">${icon(k)}${k}</button>`).join('')}</div>
