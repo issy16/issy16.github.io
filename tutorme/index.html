@@ -71,13 +71,23 @@ textarea{min-height:64px;resize:vertical;line-height:1.45}
 .sec .note{font-size:12px;color:var(--mute)}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px}
 .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 12px}
-.rates{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px}
+.rates{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:12px}
 .rate{border:1px solid var(--line);border-radius:6px;padding:8px;text-align:center}
 .rate .k{font-weight:600;font-size:13px;margin-bottom:4px}
-.pills{display:flex;gap:4px;justify-content:center}
-.pills label{cursor:pointer}
+.pills{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.pills label{cursor:pointer;min-width:0}
 .pills input{position:absolute;opacity:0;pointer-events:none}
-.pills span{display:inline-flex;width:26px;height:26px;border:1px solid var(--line);border-radius:5px;align-items:center;justify-content:center;font-size:13px}
+.pills span{display:flex;width:100%;height:28px;border:1px solid var(--line);border-radius:5px;align-items:center;justify-content:center;font-size:13px}
+.words{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.wrow{display:grid;grid-template-columns:minmax(0,1.2fr) 130px minmax(0,1.6fr) 32px;gap:6px;align-items:center}
+.wrow .x{border:0;background:none;color:var(--mute);cursor:pointer;font-size:18px;line-height:1;padding:4px}
+.wrow .x:hover{color:var(--bad)}
+.wadd{display:flex;gap:8px;flex-wrap:wrap}
+.wsum h3{font-size:14px;margin:14px 0 6px}
+.wsum table{width:100%;border-collapse:collapse;font-size:13px}
+.wsum td{padding:4px 6px;border-bottom:1px solid #e3e8ee;vertical-align:top}
+.wsum .rep{font-size:11px;font-weight:700;color:var(--warn);margin-left:4px}
+@media (max-width:640px){.wrow{grid-template-columns:minmax(0,1fr) 110px 32px}.wrow .wn{grid-column:1 / 3}}
 .pills input:checked+span{background:var(--main);border-color:var(--main);color:#fff;font-weight:700}
 .pills input:focus-visible+span{box-shadow:0 0 0 3px var(--main-soft)}
 .checks{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:12px}
@@ -471,6 +481,7 @@ const TYPES = {
   diagnosis: { label: '程度診斷', title: '程度診斷（第 1 堂講義）' },
 };
 const ERROR_TYPES = ['單字不會', '片語搭配', '文法觀念', '看錯題目', '閱讀找不到線索', '拼字', '發音 / 重音', '粗心'];
+const WORD_KINDS = ['聽不出來', '拼錯', '其他'];
 
 // diagnosis answer key (第1堂學生講義 2026-11-10)
 const KEY = {
@@ -530,6 +541,7 @@ function render() {
       <button class="btn pri" data-new="lesson" type="button">＋ 課後紀錄</button>
       <button class="btn" data-new="interview" type="button">＋ 開場訪談</button>
       <button class="btn" data-new="diagnosis" type="button">＋ 程度診斷</button>
+      <button class="btn ghost" id="wordsBtn" type="button" style="margin-left:auto">單字總表</button>
     </div>
     <div class="filters">
       <select id="fStudent" aria-label="學生"><option value="">所有學生</option>${names.map(n => `<option ${n === f.student ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
@@ -542,6 +554,7 @@ function render() {
   $('#view').querySelectorAll('.entry').forEach(el => el.onclick = () => {
     const e = S.entries.find(x => x.id === el.dataset.id); go('form', structuredClone(e));
   });
+  $('#wordsBtn').onclick = showWordSummary;
   $('#fStudent').onchange = e => { f.student = e.target.value; render(); };
   $('#fType').onchange = e => { f.type = e.target.value; render(); };
   $('#fQ').oninput = e => { f.q = e.target.value; const pos = e.target.selectionStart; render(); const q = $('#fQ'); q.focus(); q.setSelectionRange(pos, pos); };
@@ -598,33 +611,60 @@ function lessonForm() {
     <div class="grid2">${fArea('good', '做得好的地方')}${fArea('mistakes', '常錯的地方（題號、類型、原因）')}</div>
     <div class="field"><label>錯誤類型</label></div>
     <div class="checks">${ERROR_TYPES.map(t => `<label><input type="checkbox" data-arr="errorTypes" value="${esc(t)}" ${errs.includes(t) ? 'checked' : ''}>${esc(t)}</label>`).join('')}</div>
-    ${sec(3, '作業與下次準備')}
+    ${sec(3, '單字紀錄', '聽不出來：會寫但聽到認不出；拼錯：知道意思但寫錯')}
+    <div class="words" id="wordRows">${wordRowsHtml()}</div>
+    <div class="wadd no-print">${WORD_KINDS.map(k => `<button class="btn" type="button" data-addword="${k}">＋ ${k}</button>`).join('')}</div>
+    ${sec(4, '作業與下次準備')}
     <div class="grid2">${fArea('homework', '回家作業（範圍、繳交方式）', 3)}${fArea('nextFocus', '下堂課重點 / 要準備的講義', 3)}</div>
     <div class="grid3">${fDate('examDate', '下次段考')}${fText('examRange', '段考範圍', 'L1 – L3')}${fDate('nextDate', '下次上課')}</div>
-    ${sec(4, '家長回報', '先寫亮點，再寫一項重點，最後給具體作法')}
+    ${sec(5, '給學生的回饋', '先寫亮點，再寫一項重點，最後給具體作法；家長想看可以問學生')}
     <div class="grid2">
-      ${fText('p_content', '今天的內容', '第三課課文長句與分詞構句')}
-      ${fText('p_highlight', '表現很好的是', '單字小考進步到 18 分')}
-      ${fText('p_improve', '接下來會加強', '假設語氣')}
-      ${fText('p_method', '我們的做法是', '每天 5 句改錯練習')}
+      ${fText('p_content', '今天上了', '第三課課文長句與分詞構句')}
+      ${fText('p_highlight', '你做得很好的是', '單字小考進步到 18 分')}
+      ${fText('p_improve', '接下來要加強', '假設語氣')}
+      ${fText('p_method', '方法是', '每天 5 句改錯練習')}
     </div>
-    ${fText('p_homework', '本週作業（留空會用上面的回家作業）')}
-    <div class="field"><label>訊息預覽</label></div>
-    <div class="msgbox" id="parentMsg"></div>
+    ${fText('p_homework', '這週作業（留空會用上面的回家作業）')}
+    <div class="field"><label>訊息預覽（單字紀錄會自動加進去）</label></div>
+    <div class="msgbox" id="stuMsg"></div>
     <button class="btn no-print" type="button" id="copyMsg">複製訊息</button>
-    ${sec(5, '教學反思', '哪個活動有效、哪裡要調整、時間分配')}
+    ${sec(6, '教學反思', '哪個活動有效、哪裡要調整、時間分配')}
     ${fArea('reflection', '', 4)}
   `;
 }
-function parentMessage() {
+function wordRowsHtml() {
+  const words = S.editing.data.words || [];
+  if (!words.length) return '<div class="note" style="color:var(--mute);font-size:13px">還沒有單字。用下面的按鈕新增。</div>';
+  return words.map((w, i) => `<div class="wrow">
+    <input type="text" data-wi="${i}" data-wf="w" value="${esc(w.w)}" placeholder="正確單字" aria-label="單字">
+    <select data-wi="${i}" data-wf="kind" aria-label="類型">${WORD_KINDS.map(k => `<option ${k === w.kind ? 'selected' : ''}>${k}</option>`).join('')}</select>
+    <input class="wn" type="text" data-wi="${i}" data-wf="note" value="${esc(w.note)}" placeholder="${w.kind === '拼錯' ? '學生寫成…' : '備註（例：聽成 …）'}" aria-label="備註">
+    <button class="x no-print" type="button" data-delword="${i}" aria-label="刪除這個單字">×</button>
+  </div>`).join('');
+}
+function wordLines(words) {
+  const ok = (words || []).filter(w => (w.w || '').trim());
+  const out = [];
+  for (const k of WORD_KINDS) {
+    const g = ok.filter(w => w.kind === k);
+    if (!g.length) continue;
+    const list = g.map(w => k === '拼錯' && w.note ? `${w.w.trim()}（不是 ${w.note.trim()}）` : w.w.trim()).join('、');
+    out.push(`・${k}：${list}`);
+  }
+  return out;
+}
+function studentMessage() {
   const e = S.editing, d = e.data;
   const name = e.student || '＿＿';
   const hw = d.p_homework || d.homework || '＿＿';
   const next = d.nextDate ? d.nextDate.slice(5).replace('-', '/') : '＿＿';
-  return `家長您好，今天和 ${name} 上了第 ${e.lessonNo || '＿'} 堂，內容是${d.p_content || '＿＿'}。\n` +
-    `今天表現很好的是：${d.p_highlight || '＿＿'}。\n` +
-    `接下來會加強：${d.p_improve || '＿＿'}，我們的做法是${d.p_method || '＿＿'}。\n` +
-    `本週作業：${hw}，下次上課 ${next}。有任何問題歡迎隨時跟我說，謝謝！`;
+  const wl = wordLines(d.words);
+  return `${name}，今天辛苦了！\n` +
+    `今天我們上了：${d.p_content || '＿＿'}。\n` +
+    `你做得很好的是：${d.p_highlight || '＿＿'}。\n` +
+    `接下來要加強：${d.p_improve || '＿＿'}，方法是${d.p_method || '＿＿'}。\n` +
+    (wl.length ? `要複習的單字：\n${wl.join('\n')}\n` : '') +
+    `這週作業：${hw}。\n下次上課 ${next} 見，有問題隨時問我！`;
 }
 
 function interviewForm() {
@@ -720,11 +760,34 @@ function renderForm() {
     </div></form>`;
   const form = $('#entryForm');
   const refresh = () => {
-    if (e.type === 'lesson') $('#parentMsg').textContent = parentMessage();
+    if (e.type === 'lesson') $('#stuMsg').textContent = studentMessage();
     if (e.type === 'diagnosis') $('#diagOut').innerHTML = diagOutHtml();
   };
+  const redrawWords = (focusLast) => {
+    $('#wordRows').innerHTML = wordRowsHtml();
+    if (focusLast) { const ins = $('#wordRows').querySelectorAll('input[data-wf=w]'); ins[ins.length - 1]?.focus(); }
+    refresh();
+  };
+  form.addEventListener('click', ev => {
+    const add = ev.target.closest('[data-addword]'), del = ev.target.closest('[data-delword]');
+    if (add) { (e.data.words ||= []).push({ w: '', kind: add.dataset.addword, note: '' }); S.formDirty = true; redrawWords(true); }
+    if (del) { e.data.words.splice(+del.dataset.delword, 1); S.formDirty = true; redrawWords(false); }
+  });
+  form.addEventListener('keydown', ev => {
+    // Enter in a word row adds another row of the same kind instead of submitting
+    const t = ev.target;
+    if (ev.key === 'Enter' && t.dataset.wi !== undefined && !ev.isComposing) {
+      ev.preventDefault(); const kind = e.data.words[+t.dataset.wi].kind;
+      e.data.words.push({ w: '', kind, note: '' }); redrawWords(true);
+    }
+  });
   form.addEventListener('input', ev => {
     const t = ev.target; S.formDirty = true;
+    if (t.dataset.wi !== undefined) {
+      e.data.words[+t.dataset.wi][t.dataset.wf] = t.value;
+      if (t.dataset.wf === 'kind') return redrawWords(false);
+      return refresh();
+    }
     if (t.dataset.m) e[t.dataset.m] = t.type === 'number' ? (t.value === '' ? '' : +t.value) : t.value;
     else if (t.dataset.arr) {
       const arr = new Set(e.data[t.dataset.arr] || []); t.checked ? arr.add(t.value) : arr.delete(t.value);
@@ -760,10 +823,40 @@ function renderForm() {
   };
   const copy = $('#copyMsg');
   if (copy) copy.onclick = async () => {
-    try { await navigator.clipboard.writeText(parentMessage()); toast('已複製，可以貼到 LINE'); }
+    try { await navigator.clipboard.writeText(studentMessage()); toast('已複製，可以貼到 LINE'); }
     catch { toast('無法自動複製，請手動選取文字'); }
   };
   refresh();
+}
+
+/* ---------------- word summary ---------------- */
+function showWordSummary() {
+  const f = S.filter;
+  const lessons = live().filter(e => e.type === 'lesson' && (!f.student || e.student === f.student)).sort(byDateDesc);
+  const map = new Map(); // kind|word -> {w, kind, notes:[], dates:[]}
+  for (const e of lessons) for (const w of (e.data.words || [])) {
+    const word = (w.w || '').trim(); if (!word) continue;
+    const key = w.kind + '|' + word.toLowerCase();
+    const it = map.get(key) || { w: word, kind: w.kind, notes: [], dates: [] };
+    if (w.note && !it.notes.includes(w.note.trim())) it.notes.push(w.note.trim());
+    it.dates.push(e.date); map.set(key, it);
+  }
+  const groups = WORD_KINDS.map(k => [k, [...map.values()].filter(x => x.kind === k).sort((a, b) => b.dates.length - a.dates.length || (b.dates[0] || '').localeCompare(a.dates[0] || ''))]);
+  const total = map.size;
+  const text = groups.filter(([, g]) => g.length).map(([k, g]) => `【${k}】\n` + g.map(x => x.w + (x.notes.length ? `（${x.notes.join('、')}）` : '')).join('\n')).join('\n\n');
+  const m = modal(`<h2>單字總表${f.student ? `・${esc(f.student)}` : ''}</h2>
+    <div class="wsum">
+    ${total ? groups.filter(([, g]) => g.length).map(([k, g]) => `<h3>${k}（${g.length}）</h3><table>${g.map(x =>
+      `<tr><td style="width:40%"><b>${esc(x.w)}</b>${x.dates.length > 1 ? `<span class="rep">×${x.dates.length}</span>` : ''}</td><td>${esc(x.notes.join('、'))}</td><td style="width:80px;color:var(--mute);font-size:12px">${fmtDate(x.dates[0]).replace(/^\d{4} \/ /, '')}</td></tr>`).join('')}</table>`).join('')
+      : '<p style="color:var(--mute)">還沒有記錄任何單字。在課後紀錄的「單字紀錄」新增。</p>'}
+    </div>
+    <p style="font-size:12px;color:var(--mute)">×2 以上表示在不同堂課重複出錯，優先複習。篩選學生後再開啟，可以只看那位學生。</p>
+    <div style="display:flex;justify-content:space-between;gap:8px;margin-top:12px">
+      <button class="btn" id="wCopy" type="button" ${total ? '' : 'disabled'}>複製清單</button>
+      <button class="btn pri" id="wClose" type="button">關閉</button>
+    </div>`);
+  m.querySelector('#wClose').onclick = close;
+  m.querySelector('#wCopy').onclick = async () => { try { await navigator.clipboard.writeText(text); toast('已複製'); } catch { toast('無法自動複製'); } };
 }
 
 /* ---------------- settings ---------------- */
