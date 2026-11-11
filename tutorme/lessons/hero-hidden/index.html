@@ -34,7 +34,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line-soft);
   padding-block:12px 10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .bar-in{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
-.bar-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.bar-top{display:flex;justify-content:flex-end;align-items:center;gap:12px;flex-wrap:wrap}
 .kicker{font-size:12px;font-weight:600;color:var(--accent);letter-spacing:.04em}
 .stats{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
 .xp{font-weight:700;color:var(--gold);background:var(--gold-soft);border-radius:999px;padding:2px 10px;font-variant-numeric:tabular-nums}
@@ -169,11 +169,9 @@ textarea{min-height:76px;resize:vertical}
 <div class="bar">
   <div class="bar-in">
     <div class="bar-top">
-      <div class="kicker">龍騰版 高中英文 第三冊 · 閱讀素養專欄 · A Hero, Hidden</div>
       <div class="stats">
         <span class="pct" id="pct">0 / 9 stages</span>
         <span class="xp" id="xp">0 XP</span>
-        <button class="tbtn" id="teach" aria-pressed="false">教師提示</button>
       </div>
     </div>
     <div class="segs" id="segs" role="tablist" aria-label="Stages"></div>
@@ -512,7 +510,6 @@ function render(){
   paintBar();
 }
 const nm=$('#nm');nm.value=S.name||'';nm.addEventListener('input',()=>{S.name=nm.value.trim();save();});
-const tb=$('#teach');tb.addEventListener('click',()=>{teacher=!teacher;tb.setAttribute('aria-pressed',teacher);render();});
 $('#reset').addEventListener('click',()=>{
   const area=$('#resetArea');area.replaceChildren('確定清除所有進度？ ',
     el('button',{class:'linkish',onclick:()=>{S={cur:0,xp:0,done:{},solved:{},name:S.name,bestMatch:null,likes:[],dislikes:[],note:''};save();location.reload();}},'確定'),' · ',
