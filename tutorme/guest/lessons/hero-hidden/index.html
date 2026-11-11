@@ -292,8 +292,8 @@ const STAGES=[
  tip:['約 3 分鐘。這關沒有標準答案，重點是讓他帶著問題去讀。','問完等 5–10 秒，不要急著給提示。'],
  render(box,i){
   box.append(el('div',{class:'book'},'Textbook: ',el('b',{},'the title A Hero, Hidden'),' and the painting above it',el('span',{class:'zh-s'},'看課本的標題和油畫')));
-  const a=mc('p1',{n:'1',predict:true,q:'畫中間的人正在一箱禮物裡翻東西。你覺得這篇故事會講什麼？',opts:['一位英雄假扮成別人，躲起來不想被找到','一位國王把寶物分給女兒們','一場戰爭結束後的慶功宴']});
-  const b=mc('p2',{n:'2',predict:true,q:'如果有個英雄「被藏起來」，你覺得是誰把他藏起來？',opts:['他自己，因為他怕打仗','他的家人，想保護他','敵人，想讓他不能參戰']});
+  const a=mc('p1',{n:'1',predict:true,q:'In the painting, people are looking through a chest of gifts. What do you think the story is about?',opts:['A hero in disguise who is hiding so no one can find him','A king giving treasure to his daughters','A celebration after a war']});
+  const b=mc('p2',{n:'2',predict:true,q:'If a hero is "hidden," who do you think hid him?',opts:['He hid himself because he was afraid to fight.','His family, to protect him','His enemies, to keep him out of the war']});
   box.append(a,b);watch([a,b],i);
  }},
 {short:'Skim',title:'Timed Skim',sub:'Read the whole passage for the main idea only.',zh:'限時讀完全文，抓大意就好。',
@@ -307,7 +307,7 @@ const STAGES=[
   const fin=el('button',{class:'btn ghost',disabled:''},'Done');
   const qwrap=el('div');
   const showQ=()=>{
-    const q=mc('s1',{n:'',q:'用一句話說，這篇在講什麼？',opts:['阿基里斯從小就想當國王，最後真的當上了','阿基里斯的媽媽為了讓他躲過戰爭而把他藏起來，奧德修斯設計要找出他','奧德修斯在特洛伊戰爭中打敗了阿基里斯','國王的女兒們送禮物給希臘將領'],ans:1,ok:'主軸：藏人與找人。',hint:'誰被藏起來？誰在找他？'});
+    const q=mc('s1',{n:'',q:'In one sentence, what is the passage about?',opts:['Achilles wanted to be a king and finally became one.','Achilles\u2019 mother hid him to keep him out of the war, and Odysseus made a plan to find him.','Odysseus defeated Achilles in the Trojan War.','The king\u2019s daughters gave gifts to the Greek leaders.'],ans:1,ok:'The story is about hiding and finding. 主軸：藏人與找人。',hint:'Who is hidden? Who is looking for him? 誰被藏起來？誰在找他？'});
     qwrap.replaceChildren(q);watch([q],i);
   };
   go.addEventListener('click',()=>{
