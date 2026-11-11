@@ -76,7 +76,10 @@ main{padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px)
 .mhead{display:flex;gap:12px;align-items:flex-start}
 .badge{flex:none;width:34px;height:34px;border-radius:7px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:700;font-size:15px}
 .mhead h2{margin:0;font-size:20px;line-height:1.3;text-wrap:balance}
-.mhead p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.mhead p{margin:2px 0 0;color:var(--fg);font-size:14.5px}
+.mhead p.zh,.zh-s{color:var(--muted);font-size:13px}
+.zh-s{display:block;margin-top:1px}
+.rules .zh{color:var(--muted);font-size:13px}
 .book{display:flex;gap:10px;align-items:center;background:var(--surface);border-radius:8px;padding:10px 14px;font-size:14px}
 .book b{color:var(--accent)}
 .tip{border-left:3px solid var(--gold);background:var(--gold-soft);padding:10px 14px;border-radius:0 8px 8px 0;font-size:13.5px;color:var(--fg)}
@@ -168,12 +171,12 @@ textarea{min-height:76px;resize:vertical}
     <div class="bar-top">
       <div class="kicker">龍騰版 高中英文 第三冊 · 閱讀素養專欄 · A Hero, Hidden</div>
       <div class="stats">
-        <span class="pct" id="pct">0 / 9 關</span>
+        <span class="pct" id="pct">0 / 9 stages</span>
         <span class="xp" id="xp">0 XP</span>
         <button class="tbtn" id="teach" aria-pressed="false">教師提示</button>
       </div>
     </div>
-    <div class="segs" id="segs" role="tablist" aria-label="關卡進度"></div>
+    <div class="segs" id="segs" role="tablist" aria-label="Stages"></div>
   </div>
 </div>
 
@@ -181,11 +184,11 @@ textarea{min-height:76px;resize:vertical}
   <div class="wrap">
     <div class="hero">
       <h1>A Hero, Hidden</h1>
-      <div class="sub">被藏起來的英雄 · 9 關 · 每關計 XP</div>
-      <div class="who"><label for="nm">Player</label><input id="nm" placeholder="名字" maxlength="12"></div>
+      <div class="sub">9 stages · earn XP in every stage<span class="zh-s">被藏起來的英雄 · 9 關 · 每關計 XP</span></div>
+      <div class="who"><label for="nm">Player</label><input id="nm" placeholder="Your name" maxlength="12"></div>
     </div>
     <section class="mission" id="stage" aria-live="polite"></section>
-    <div class="foot"><span><a href="../" style="color:var(--muted)">← 所有課程</a> · 課文請看課本，這裡只放練習。</span><span id="resetArea"><button class="linkish" id="reset">重新開始</button></span></div>
+    <div class="foot"><span><a href="../" style="color:var(--muted)">← All lessons</a> · Use your textbook for the passage. 課文請看課本。</span><span id="resetArea"><button class="linkish" id="reset">Reset 重新開始</button></span></div>
   </div>
 </main>
 
@@ -218,7 +221,7 @@ function mc(id,{q,opts,ans,ok,ev,hint,n,predict}){
         [...list.children].forEach(c=>{c.classList.remove('pick');c.disabled=true;});
         b.classList.add('pick');
         if(S.solved[id]===undefined){S.solved[id]=i;addXP(5);}
-        fb.className='fb neutral';fb.innerHTML='<b>預測已鎖定。</b> 第 8 關揭曉。';
+        fb.className='fb neutral';fb.innerHTML='<b>Prediction locked.</b> Revealed in Stage 8. 第 8 關揭曉。';
         box.dispatchEvent(new Event('solved'));return;
       }
       tries++;
@@ -267,43 +270,43 @@ const VOCAB=[
 ];
 function say(w){try{const u=new SpeechSynthesisUtterance(w);u.lang='en-US';u.rate=.85;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
 const STAGES=[
-{short:'單字',title:'單字預習',sub:'11 個本課關鍵字。先自己唸、猜意思，再點開卡片確認。全部翻開即過關。',
+{short:'Vocab',title:'Vocabulary Preview',sub:'Say each word out loud and guess its meaning. Then tap the card to check. Flip all 11 cards to clear.',zh:'先自己唸、猜意思，再點開卡片確認。全部翻開即過關。',
  tip:['約 5 分鐘。讓他照大寫音節唸一次，重音唸錯就請他按「播放」對照。','翻卡前先問他猜什麼意思，猜對或猜錯都可以，重點是先動腦。'],
  render(box,i){
-  box.append(el('div',{class:'vkey'},'發音標示：',el('b',{},'大寫藍字'),' 是重音節。例如 dis-',el('b',{},'GYZE'),'，重音在第二音節。'));
+  box.append(el('div',{class:'vkey'},'Stress: syllables in ',el('b',{},'BLUE CAPS'),' are stressed, e.g. dis-',el('b',{},'GYZE'),'.',el('span',{class:'zh-s'},'大寫藍字是重音節，例如 disguise 重音在第二音節。')));
   const seen=S.solved.vocab||{};const grid=el('div',{class:'vgrid'});const cnt=el('div',{class:'mstat'});
-  const paint=()=>{const n=Object.keys(seen).length;cnt.innerHTML='已翻開 <b>'+n+' / '+VOCAB.length+'</b>';if(n===VOCAB.length)markDone(i);};
+  const paint=()=>{const n=Object.keys(seen).length;cnt.innerHTML='Flipped <b>'+n+' / '+VOCAB.length+'</b>';if(n===VOCAB.length)markDone(i);};
   VOCAB.forEach(([w,pos,r,zh,ex])=>{
     const resp=el('div',{class:'vr'});r.split('-').forEach((p,k)=>{if(k)resp.append('-');p===p.toUpperCase()?resp.append(el('b',{},p)):resp.append(p.toLowerCase());});
     const back=el('div',{class:'vb'},el('span',{class:'zh'},zh),el('span',{class:'ex'},ex));
-    const hint=el('div',{class:'vhint'},'點擊翻開');
+    const hint=el('div',{class:'vhint'},'Tap to flip');
     const card=el('div',{class:'vcard'});
     const flip=el('button',{class:'vflip','aria-expanded':'false'},el('div',{class:'vtop'},el('span',{class:'vw'},w),el('span',{class:'vp'},pos)),resp,back,hint);
     const show=on=>{back.hidden=!on;hint.hidden=on;card.classList.toggle('on',on);flip.setAttribute('aria-expanded',on);};
     show(!!seen[w]);
     flip.addEventListener('click',()=>{const on=back.hidden;show(on);if(on&&!seen[w]){seen[w]=1;S.solved.vocab=seen;addXP(2);paint();}});
-    card.append(flip,el('button',{class:'vplay',onclick:()=>say(w)},'播放發音'));
+    card.append(flip,el('button',{class:'vplay',onclick:()=>say(w)},'Play audio'));
     grid.append(card);
   });
   box.append(cnt,grid);paint();
  }},
-{short:'預測',title:'先猜再讀',sub:'還不要翻課本內文。只看標題和那幅畫。',
+{short:'Predict',title:'Predict Before You Read',sub:'Don\u2019t read the passage yet. Look only at the title and the painting.',zh:'還不要讀內文，只看標題和那幅畫。',
  tip:['約 3 分鐘。這關沒有標準答案，重點是讓他帶著問題去讀。','問完等 5–10 秒，不要急著給提示。'],
  render(box,i){
-  box.append(el('div',{class:'book'},'看課本：',el('b',{},'標題 A Hero, Hidden'),'和上方的油畫'));
+  box.append(el('div',{class:'book'},'Textbook: ',el('b',{},'the title A Hero, Hidden'),' and the painting above it',el('span',{class:'zh-s'},'看課本的標題和油畫')));
   const a=mc('p1',{n:'1',predict:true,q:'畫中間的人正在一箱禮物裡翻東西。你覺得這篇故事會講什麼？',opts:['一位英雄假扮成別人，躲起來不想被找到','一位國王把寶物分給女兒們','一場戰爭結束後的慶功宴']});
   const b=mc('p2',{n:'2',predict:true,q:'如果有個英雄「被藏起來」，你覺得是誰把他藏起來？',opts:['他自己，因為他怕打仗','他的家人，想保護他','敵人，想讓他不能參戰']});
   box.append(a,b);watch([a,b],i);
  }},
-{short:'略讀',title:'限時略讀',sub:'讀完全文，抓大意就好。',
+{short:'Skim',title:'Timed Skim',sub:'Read the whole passage for the main idea only.',zh:'限時讀完全文，抓大意就好。',
  tip:['3 分鐘。禁止查字典、禁止停下來翻譯，這是學測閱讀最需要的能力。','讀完先讓他用一句中文說大意，再做下面的選擇題。'],
  render(box,i){
-  box.append(el('div',{class:'book'},'翻開課本，讀 ',el('b',{},'第 1–28 行'),'（到 sat back and waited 為止）'));
-  box.append(el('ul',{class:'rules'},el('li',{},'不查字典，看不懂的字先跳過'),el('li',{},'不要回頭重讀'),el('li',{},'提早完成有時間加成')));
+  box.append(el('div',{class:'book'},'Read ',el('b',{},'lines 1\u201328'),' (up to \u201csat back and waited\u201d)',el('span',{class:'zh-s'},'讀課本第 1–28 行')));
+  box.append(el('ul',{class:'rules'},el('li',{},'No dictionary. Skip words you don\u2019t know. ',el('span',{class:'zh'},'不查字典')),el('li',{},'Don\u2019t go back and reread. ',el('span',{class:'zh'},'不回頭重讀')),el('li',{},'Finish early for a time bonus. ',el('span',{class:'zh'},'提早完成有加成'))));
   let t=180,iv=null,started=false;const clock=el('div',{class:'clock'},'3:00');
   const fmt=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
-  const go=el('button',{class:'btn'},'開始計時');
-  const fin=el('button',{class:'btn ghost',disabled:''},'完成');
+  const go=el('button',{class:'btn'},'Start');
+  const fin=el('button',{class:'btn ghost',disabled:''},'Done');
   const qwrap=el('div');
   const showQ=()=>{
     const q=mc('s1',{n:'',q:'用一句話說，這篇在講什麼？',opts:['阿基里斯從小就想當國王，最後真的當上了','阿基里斯的媽媽為了讓他躲過戰爭而把他藏起來，奧德修斯設計要找出他','奧德修斯在特洛伊戰爭中打敗了阿基里斯','國王的女兒們送禮物給希臘將領'],ans:1,ok:'主軸：藏人與找人。',hint:'誰被藏起來？誰在找他？'});
@@ -311,7 +314,7 @@ const STAGES=[
   };
   go.addEventListener('click',()=>{
     if(started)return;started=true;go.disabled=true;fin.disabled=false;
-    iv=setInterval(()=>{t--;clock.textContent=fmt(Math.max(t,0));if(t<=0){clearInterval(iv);clock.classList.add('end');clock.textContent='0:00';fin.textContent='時間到，繼續';}},1000);
+    iv=setInterval(()=>{t--;clock.textContent=fmt(Math.max(t,0));if(t<=0){clearInterval(iv);clock.classList.add('end');clock.textContent='0:00';fin.textContent='Time\u2019s up \u2192';}},1000);
   });
   fin.addEventListener('click',()=>{
     clearInterval(iv);fin.disabled=true;
@@ -322,7 +325,7 @@ const STAGES=[
   if(S.solved.skim!==undefined){go.disabled=true;clock.textContent='已完成';showQ();}
   box.append(el('div',{class:'timer'},clock,el('div',{class:'row'},go,fin)),qwrap);
  }},
-{short:'細讀',title:'偵探任務',sub:'每題都要能在課本裡找到證據。答對會顯示證據在哪幾行。',
+{short:'Detail',title:'Find the Evidence',sub:'Every answer has proof in the passage. A correct answer shows which lines.',zh:'每題都要在課本找到證據，答對會顯示證據在第幾行。',
  tip:['約 10 分鐘。答錯時不要直接講答案，問他「你是看哪一句選的？」','第 4 題是推論題，學測最常錯的類型，可以多停一下。'],
  render(box,i){
   const qs=[
@@ -334,15 +337,15 @@ const STAGES=[
   ];
   qs.forEach(q=>box.append(q));watch(qs,i);
  }},
-{short:'配對',title:'單字配對賽',sub:'點一個英文，再點它的中文。全部配完會記錄你的時間。',
+{short:'Match',title:'Word Match',sub:'Tap a word, then tap its meaning. Your time is recorded.',zh:'點英文，再點對應的中文。完成會記錄時間。',
  tip:['約 5 分鐘。可以玩兩次，第二次通常會快很多，讓他看到進步。','這 8 個字都是大考詞彙（課本有 * 號），可以問他記最快的是哪個、為什麼。'],
  render(box,i){
   const W=[['myth','神話'],['legendary','傳奇的'],['warrior','戰士'],['combat','戰鬥'],['prophecy','預言'],['disguise','偽裝；喬裝'],['devise','想出；設計'],['shield','盾牌；保護']];
   const stat=el('div',{class:'mstat'});
   let selEn=null,selZh=null,matched=0,miss=0,t0=null,tick=null;
-  const showStat=(extra)=>{const s=t0?((Date.now()-t0)/1000).toFixed(1):'0.0';stat.innerHTML='時間 <b>'+s+' 秒</b><span>錯誤 <b>'+miss+'</b></span><span>最佳紀錄 <b>'+(S.bestMatch?S.bestMatch.toFixed(1)+' 秒':'—')+'</b></span>'+(extra||'');};
+  const showStat=(extra)=>{const s=t0?((Date.now()-t0)/1000).toFixed(1):'0.0';stat.innerHTML='Time <b>'+s+'s</b><span>Misses <b>'+miss+'</b></span><span>Best <b>'+(S.bestMatch?S.bestMatch.toFixed(1)+'s':'—')+'</b></span>'+(extra||'');};
   const grid=el('div',{class:'match'}),cEn=el('div',{class:'mcol'}),cZh=el('div',{class:'mcol'});
-  const again=el('button',{class:'btn ghost'},'重玩');
+  const again=el('button',{class:'btn ghost'},'Replay');
   function build(){
     selEn=selZh=null;matched=0;miss=0;t0=null;clearInterval(tick);
     cEn.replaceChildren();cZh.replaceChildren();
@@ -378,7 +381,7 @@ const STAGES=[
   grid.append(cEn,cZh);box.append(stat,grid,el('div',{class:'row'},again));build();
   if(S.solved.match)markDone(i);
  }},
-{short:'填空',title:'單字放對位置',sub:'先點一個空格，再點上面的單字。有兩個是多出來的。',
+{short:'Fill',title:'Fill in the Blanks',sub:'Tap a blank, then tap a word. Two words are extra.',zh:'先點空格，再點單字。有兩個是多餘的。',
  tip:['約 7 分鐘。最後兩題是本課的兩個重點句型：seem destined to V. 和 an array of N.','填錯時問他：這個空格前後是什麼詞性？'],
  render(box,i){
   const items=[
@@ -419,7 +422,7 @@ const STAGES=[
   box.prepend(bankEl);box.append(fb);nextOpen();
   if(blanks.every(x=>x.disabled))markDone(i);
  }},
-{short:'句構',title:'句子拼圖',sub:'把詞塊排成正確的句子。藍色底線的是主詞，先找它。',
+{short:'Build',title:'Sentence Builder',sub:'Put the chunks in order. The chunk with a blue underline is the subject. Find it first.',zh:'把詞塊排成句子。藍色底線是主詞。',
  tip:['約 8 分鐘。拼完後請他看課本第 8–9 行和第 16–17 行，找出跟拼圖一樣結構的句子。','重點：分詞構句 Disguised in…, S + V（被偽裝的人就是主詞）。'],
  render(box,i){
   const P=[
@@ -447,10 +450,10 @@ const STAGES=[
     }
     q.append(buildEl,pool,fb);box.append(q);boxes.push(q);
   });
-  box.append(el('div',{class:'legend'},'拼完後回課本：第 8–9 行、第 16–17 行、第 23–24 行，各有一句跟這三題一樣的結構。'));
+  box.append(el('div',{class:'legend'},'Back to the textbook: lines 8\u20139, 16\u201317 and 23\u201324 each use one of these structures.',el('span',{class:'zh-s'},'課本第 8–9、16–17、23–24 行各有一句同樣的結構。')));
   watch(boxes,i);
  }},
-{short:'結局',title:'結局揭曉',sub:'課文停在 Then he sat back and waited… 接下來發生什麼？',
+{short:'Ending',title:'The Ending',sub:'The passage stops at \u201cThen he sat back and waited\u2026\u201d What happens next?',zh:'課文停在這裡，接下來發生什麼？',
  tip:['約 5 分鐘。先讓他選，再對照第 2 關的預測。','Achilles’ heel 是常見片語，閱讀和翻譯都可能出現。'],
  render(box,i){
   const p=mc('e1',{n:'1.',predict:true,q:'你覺得接下來發生什麼事？',opts:['國王很生氣，把奧德修斯趕走','阿基里斯忍住不碰武器，奧德修斯空手而回','阿基里斯一看到劍和盾就拿起來，身分被拆穿','國王的一個女兒拿走武器，被誤認成阿基里斯']});
@@ -467,7 +470,7 @@ const STAGES=[
   box.append(p,h);if(S.solved.e1!==undefined)showR();
   watch([p,h],i);
  }},
-{short:'結算',title:'今日結算',sub:'學測閱讀題考的就是今天做的事：抓主旨、找證據、推論、看懂長句。',
+{short:'Recap',title:'Today\u2019s Results',sub:'GSAT reading tests exactly this: main idea, evidence, inference and long sentences.',zh:'學測閱讀考的就是今天做的事：主旨、證據、推論、長句。',
  tip:['約 3 分鐘。下面兩題的結果，是下次調整上課方式的依據。'],
  render(box,i){
   markDone(i);
@@ -475,15 +478,15 @@ const STAGES=[
   const doneN=()=>Object.keys(S.done).length;
   const sum=el('div',{class:'sum'});
   const paintSum=()=>sum.replaceChildren(
-    el('div',{class:'tile'},el('span',{class:'v'},S.xp+''),el('span',{class:'l'},'今天的 XP')),
-    el('div',{class:'tile'},el('span',{class:'v'},doneN()+' / '+STAGES.length),el('span',{class:'l'},'完成關卡')),
-    el('div',{class:'tile'},el('span',{class:'v'},S.bestMatch?S.bestMatch.toFixed(1)+'s':'—'),el('span',{class:'l'},'配對最佳紀錄')));
+    el('div',{class:'tile'},el('span',{class:'v'},S.xp+''),el('span',{class:'l'},'XP today')),
+    el('div',{class:'tile'},el('span',{class:'v'},doneN()+' / '+STAGES.length),el('span',{class:'l'},'Stages cleared')),
+    el('div',{class:'tile'},el('span',{class:'v'},S.bestMatch?S.bestMatch.toFixed(1)+'s':'—'),el('span',{class:'l'},'Best match time')));
   paintSum();document.addEventListener('xp',paintSum);
   const vote=(key,label)=>{const m=el('div',{class:'multi'});STAGES.slice(0,-1).forEach((s,k)=>{const b=el('button',{class:'tog','aria-pressed':S[key].includes(k)?'true':'false'},s.short);
     b.addEventListener('click',()=>{const a=S[key],x=a.indexOf(k);x<0?a.push(k):a.splice(x,1);b.setAttribute('aria-pressed',x<0?'true':'false');save();});m.append(b);});
     return el('div',{class:'q'},el('div',{class:'qt'},label),m);};
-  const note=el('textarea',{id:'note',placeholder:'給老師的回饋（選填）'});note.value=S.note||'';note.addEventListener('input',()=>{S.note=note.value;save();});
-  box.append(sum,vote('likes','哪幾關還不錯？（可複選）'),vote('dislikes','哪幾關最無聊？（可複選）'),note);
+  const note=el('textarea',{id:'note',placeholder:'Anything for your teacher? (optional) 給老師的回饋'});note.value=S.note||'';note.addEventListener('input',()=>{S.note=note.value;save();});
+  box.append(sum,vote('likes','Which stages did you like? 哪幾關還不錯？'),vote('dislikes','Which stages were boring? 哪幾關最無聊？'),note);
  }}
 ];
 
@@ -492,17 +495,17 @@ function paintBar(){
   const segs=$('#segs');segs.replaceChildren();
   STAGES.forEach((s,k)=>{const b=el('button',{class:'seg'+(S.done[k]?' done':'')+(k===S.cur?' cur':''),role:'tab','aria-selected':k===S.cur?'true':'false',title:s.title},(k+1)+' '+s.short);
     b.addEventListener('click',()=>go(k));segs.append(b);});
-  $('#pct').textContent=Object.keys(S.done).length+' / '+STAGES.length+' 關';
+  $('#pct').textContent=Object.keys(S.done).length+' / '+STAGES.length+' stages';
   $('#xp').textContent=S.xp+' XP';
   document.dispatchEvent(new Event('xp'));
 }
 function go(k){S.cur=k;save();render();window.scrollTo({top:0,behavior:'smooth'});}
 function render(){
   const s=STAGES[S.cur],box=$('#stage');box.replaceChildren();
-  box.append(el('div',{class:'mhead'},el('div',{class:'badge'},(S.cur+1)+''),el('div',{},el('h2',{},'第 '+(S.cur+1)+' 關 · '+s.title),el('p',{},s.sub))));
+  box.append(el('div',{class:'mhead'},el('div',{class:'badge'},(S.cur+1)+''),el('div',{},el('h2',{},'Stage '+(S.cur+1)+' \u00b7 '+s.title),el('p',{},s.sub),s.zh?el('p',{class:'zh'},s.zh):null)));
   if(teacher)box.append(el('div',{class:'tip'},el('strong',{},'教師提示'),el('ul',{},...s.tip.map(t=>el('li',{},t)))));
   const body=el('div',{style:'display:flex;flex-direction:column;gap:14px'});box.append(body);s.render(body,S.cur);
-  const prev=el('button',{class:'btn ghost'},'上一關'),LAST=STAGES.length-1,next=el('button',{class:'btn'},S.cur===LAST?'回到第 1 關':'下一關');
+  const prev=el('button',{class:'btn ghost'},'Back'),LAST=STAGES.length-1,next=el('button',{class:'btn'},S.cur===LAST?'Back to Stage 1':'Next');
   if(S.cur===0)prev.disabled=true;
   prev.addEventListener('click',()=>go(S.cur-1));next.addEventListener('click',()=>go(S.cur===LAST?0:S.cur+1));
   box.append(el('div',{class:'nav'},prev,next));
