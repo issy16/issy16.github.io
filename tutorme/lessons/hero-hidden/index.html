@@ -454,16 +454,17 @@ const STAGES=[
 {short:'Ending',title:'The Ending',sub:'The passage stops at \u201cThen he sat back and waited\u2026\u201d What happens next?',zh:'課文停在這裡，接下來發生什麼？',
  tip:['約 5 分鐘。先讓他選，再對照第 2 關的預測。','Achilles’ heel 是常見片語，閱讀和翻譯都可能出現。'],
  render(box,i){
-  const p=mc('e1',{n:'1.',predict:true,q:'你覺得接下來發生什麼事？',opts:['國王很生氣，把奧德修斯趕走','阿基里斯忍住不碰武器，奧德修斯空手而回','阿基里斯一看到劍和盾就拿起來，身分被拆穿','國王的一個女兒拿走武器，被誤認成阿基里斯']});
+  const p=mc('e1',{n:'1.',predict:true,q:'What do you think happened next?',opts:['The king got angry and sent Odysseus away.','Achilles ignored the weapons, and Odysseus left with nothing.','Achilles grabbed the sword and shield, and his secret was out.','One of the daughters took the weapons and was mistaken for Achilles.']});
   const rv=el('div',{class:'reveal'});
   const showR=()=>{rv.replaceChildren(
-    el('p',{},el('b',{style:'color:var(--accent)'},'神話裡的結局是 C。')),
-    el('p',{},'公主們都去挑衣服和珠寶，只有一個「女孩」直接抓起了劍和盾。有些版本還說，奧德修斯故意讓號角突然響起，假裝敵人來襲，阿基里斯本能地拿起武器準備戰鬥。'),
-    el('p',{},'身分被拆穿後，阿基里斯跟著希臘大軍去了特洛伊，成為最強的戰士。可是預言還是成真了：他在戰場上被一箭射中腳後跟而死，因為那是他全身唯一的弱點。'),
-    el('p',{style:'color:var(--muted);font-size:14px'},'第 2 關預測：'+(S.solved.p1!==undefined?L[S.solved.p1]+(S.solved.p1===0?'（命中）':''):'未作答')));
+    el('p',{},el('b',{style:'color:var(--accent)'},'In the myth, the answer is C.')),
+    el('p',{},'The daughters went straight for the clothes and jewelry, but one \u201cgirl\u201d reached for the sword and shield. In some versions, Odysseus had a trumpet sound an alarm, as if enemies were attacking, and Achilles grabbed the weapons by instinct.'),
+    el('p',{},'Once he was discovered, Achilles sailed to Troy and became the greatest warrior of the war. But the prophecy came true: he was killed by an arrow to his heel, the only weak spot on his body.'),
+    el('p',{class:'zh-s'},'公主們挑衣服珠寶，只有阿基里斯拿起劍和盾而被識破。他去了特洛伊成為最強戰士，最後被一箭射中腳後跟（唯一的弱點）而死，預言成真。'),
+    el('p',{style:'color:var(--muted);font-size:14px'},'Your Stage 2 prediction: '+(S.solved.p1!==undefined?L[S.solved.p1]+(S.solved.p1===0?' (correct)':''):'not answered')));
     if(!rv.parentNode)box.insertBefore(rv,h);
   };
-  const h=mc('e2',{n:'2.',q:'所以英文的 "Achilles’ heel" 是什麼意思？\n例：Math is my Achilles’ heel.',opts:['最強的武器','唯一的弱點','跑得很快的人','一個祕密計畫'],ans:1,ok:'Achilles’ heel = 致命的弱點。',hint:'他是怎麼死的？'});
+  const h=mc('e2',{n:'2.',q:'So what does "Achilles’ heel" mean? e.g. Math is my Achilles’ heel.',opts:['a powerful weapon','a weak point','a very fast runner','a secret plan'],ans:1,ok:'Achilles’ heel = a weak point 致命的弱點。',hint:'How did Achilles die? 他是怎麼死的？'});
   p.addEventListener('solved',showR);
   box.append(p,h);if(S.solved.e1!==undefined)showR();
   watch([p,h],i);
