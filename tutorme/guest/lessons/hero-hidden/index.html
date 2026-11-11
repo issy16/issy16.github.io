@@ -89,6 +89,9 @@ main{padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px)
 .q{display:flex;flex-direction:column;gap:10px;padding:14px 0;border-top:1px solid var(--line-soft)}
 .q:first-of-type{border-top:0;padding-top:0}
 .qt{font-weight:600;display:flex;gap:8px}
+.zhbtn{flex:none;margin-left:auto;align-self:flex-start;border:1px solid var(--line);background:var(--raise);border-radius:999px;padding:1px 10px;font-size:12px;font-weight:600;color:var(--muted)}
+.zhbtn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.qzh{font-size:14px;color:var(--muted);background:var(--surface);border-radius:6px;padding:6px 10px}
 .qt .n{color:var(--accent);flex:none;font-variant-numeric:tabular-nums}
 .opts{display:grid;gap:8px}
 .opt{text-align:left;border:1px solid var(--line);background:var(--raise);border-radius:8px;padding:10px 12px;color:var(--opt);display:flex;gap:10px;align-items:flex-start;transition:border-color .15s,background .15s}
@@ -206,9 +209,26 @@ function addXP(n){S.xp+=n;save();paintBar();}
 function markDone(i){if(!S.done[i]){S.done[i]=true;save();paintBar();}}
 
 /* ---------- multiple choice ---------- */
+const ZHQ={
+ p1:'畫裡的人正在翻一箱禮物。你覺得這篇故事在講什麼？',
+ p2:'如果有個英雄「被藏起來」，你覺得是誰把他藏起來的？',
+ s1:'用一句話說，這篇文章在講什麼？',
+ d1:'這篇文章主要在講什麼？',
+ d2:'阿基里斯的媽媽為什麼要把他藏起來？',
+ d3:'阿基里斯在斯基羅斯島上是怎麼被藏起來的？',
+ d4:'奧德修斯為什麼要在禮物裡放劍和盾？',
+ d5:'第 11 行「a troubling prophecy overshadowed his future」的意思是這個預言＿＿。',
+ e1:'你覺得接下來發生了什麼事？',
+ e2:'所以「Achilles’ heel」是什麼意思？例：Math is my Achilles’ heel.'
+};
 function mc(id,{q,opts,ans,ok,ev,hint,n,predict}){
   const box=el('div',{class:'q'});
-  box.append(el('div',{class:'qt'},n?el('span',{class:'n'},n):null,el('span',{},q)));
+  const zq=ZHQ[id];let zline=null,zb=null;
+  if(zq){zline=el('div',{class:'qzh'},zq);zline.hidden=true;
+    zb=el('button',{class:'zhbtn','aria-pressed':'false',title:'Show the question in Chinese'},'中文');
+    zb.addEventListener('click',()=>{zline.hidden=!zline.hidden;zb.setAttribute('aria-pressed',!zline.hidden);});}
+  box.append(el('div',{class:'qt'},n?el('span',{class:'n'},n):null,el('span',{style:'min-width:0'},q),zb));
+  if(zline)box.append(zline);
   const list=el('div',{class:'opts'}), fb=el('div');
   let tries=0;
   const prev=S.solved[id];
