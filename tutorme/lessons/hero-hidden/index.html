@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>A Hero, Hidden 互動課</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&family=Cormorant+Garamond:ital,wght@1,600&display=swap">
+<style>
+/* Layout: sticky mission bar with segmented progress on top, one mission card at a time below, centered column ≤ 760px */
+:root{
+  --bg:#ffffff; --surface:#f4f6f9; --raise:#ffffff; --line:#c9d1db; --line-soft:#e3e8ee;
+  --fg:#1d2430; --muted:#5b6472; --opt:#3a4350;
+  --accent:#2b5c8a; --accent-soft:#e7eef6; --on-accent:#ffffff;
+  --good:#2f7a4c; --good-soft:#e5f3ea; --bad:#b1432f; --bad-soft:#fbeae6; --gold:#b07d1a; --gold-soft:#fbf2dc;
+  --f-body:Inter,'Noto Sans TC','PingFang TC','Noto Sans CJK TC','Microsoft JhengHei',sans-serif;
+  --f-display:'Cormorant Garamond',Georgia,'Times New Roman',serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10151c; --surface:#18202a; --raise:#1c2531; --line:#33404f; --line-soft:#26303c;
+  --fg:#e6ebf1; --muted:#9aa6b4; --opt:#c5ced9;
+  --accent:#86b4e2; --accent-soft:#1e2e40; --on-accent:#0d1a27;
+  --good:#6cc28f; --good-soft:#18301f; --bad:#ec8d78; --bad-soft:#3a201b; --gold:#e2b55a; --gold-soft:#33291a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10151c; --surface:#18202a; --raise:#1c2531; --line:#33404f; --line-soft:#26303c;
+  --fg:#e6ebf1; --muted:#9aa6b4; --opt:#c5ced9;
+  --accent:#86b4e2; --accent-soft:#1e2e40; --on-accent:#0d1a27;
+  --good:#6cc28f; --good-soft:#18301f; --bad:#ec8d78; --bad-soft:#3a201b; --gold:#e2b55a; --gold-soft:#33291a; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line-soft);
+  padding-block:12px 10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.bar-in{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.bar-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.kicker{font-size:12px;font-weight:600;color:var(--accent);letter-spacing:.04em}
+.stats{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+.xp{font-weight:700;color:var(--gold);background:var(--gold-soft);border-radius:999px;padding:2px 10px;font-variant-numeric:tabular-nums}
+.pct{font-variant-numeric:tabular-nums}
+.tbtn{border:1px solid var(--line);background:var(--raise);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--muted)}
+.tbtn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.segs{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px}
+.vkey{font-size:13px;color:var(--muted)}
+.vkey b{color:var(--accent)}
+.vgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.vcard{border:1px solid var(--line);border-radius:10px;background:var(--raise);display:flex;flex-direction:column;min-width:0;transition:border-color .15s}
+.vcard.on{border-color:var(--accent)}
+.vflip{border:0;background:none;text-align:left;padding:12px 14px;display:flex;flex-direction:column;gap:3px;flex:1}
+.vtop{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.vw{font-size:18px;font-weight:700}
+.vp{font-size:12px;color:var(--muted)}
+.vr{font-size:14px;color:var(--muted);letter-spacing:.03em}
+.vr b{color:var(--accent);font-weight:700}
+.vb{margin-top:6px;padding-top:6px;border-top:1px solid var(--line-soft);font-size:14px;display:flex;flex-direction:column;gap:2px}
+.vb .zh{font-weight:600}
+.vb .ex{color:var(--opt)}
+.vhint{font-size:12px;color:var(--muted);margin-top:4px}
+.vplay{border:0;border-top:1px solid var(--line-soft);background:none;padding:7px 14px;text-align:left;font-size:12px;font-weight:600;color:var(--accent)}
+@media (max-width:520px){.vgrid{grid-template-columns:1fr}}
+.seg{height:28px;border:0;border-radius:5px;background:var(--surface);position:relative;overflow:hidden;font-size:11px;color:var(--muted);padding:0;font-weight:600;font-variant-numeric:tabular-nums}
+.seg.done{background:var(--accent);color:var(--on-accent)}
+.seg.cur{box-shadow:inset 0 0 0 2px var(--accent);color:var(--accent)}
+.seg.done.cur{color:var(--on-accent);box-shadow:inset 0 0 0 2px var(--fg)}
+
+main{padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.hero{display:flex;flex-direction:column;gap:6px;padding-bottom:6px}
+.hero h1{margin:0;font-family:var(--f-display);font-style:italic;font-weight:600;font-size:clamp(34px,7vw,48px);line-height:1.05;letter-spacing:.01em;text-wrap:balance}
+.hero .sub{color:var(--muted);font-size:14px}
+.who{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+.who input{border:0;border-bottom:1px solid var(--line);background:transparent;padding:2px 4px;width:9em;font:inherit;color:var(--fg)}
+
+.mission{display:flex;flex-direction:column;gap:16px}
+.mhead{display:flex;gap:12px;align-items:flex-start}
+.badge{flex:none;width:34px;height:34px;border-radius:7px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:700;font-size:15px}
+.mhead h2{margin:0;font-size:20px;line-height:1.3;text-wrap:balance}
+.mhead p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.book{display:flex;gap:10px;align-items:center;background:var(--surface);border-radius:8px;padding:10px 14px;font-size:14px}
+.book b{color:var(--accent)}
+.tip{border-left:3px solid var(--gold);background:var(--gold-soft);padding:10px 14px;border-radius:0 8px 8px 0;font-size:13.5px;color:var(--fg)}
+.tip strong{color:var(--gold)}
+.tip ul{margin:4px 0 0;padding-left:18px}
+
+.q{display:flex;flex-direction:column;gap:10px;padding:14px 0;border-top:1px solid var(--line-soft)}
+.q:first-of-type{border-top:0;padding-top:0}
+.qt{font-weight:600;display:flex;gap:8px}
+.qt .n{color:var(--accent);flex:none;font-variant-numeric:tabular-nums}
+.opts{display:grid;gap:8px}
+.opt{text-align:left;border:1px solid var(--line);background:var(--raise);border-radius:8px;padding:10px 12px;color:var(--opt);display:flex;gap:10px;align-items:flex-start;transition:border-color .15s,background .15s}
+.opt:hover:not(:disabled){border-color:var(--accent)}
+.opt .k{flex:none;width:22px;height:22px;border-radius:5px;border:1px solid var(--line);display:grid;place-items:center;font-size:12px;font-weight:700}
+.opt.ok{border-color:var(--good);background:var(--good-soft);color:var(--fg)}
+.opt.ok .k{background:var(--good);border-color:var(--good);color:var(--bg)}
+.opt.no{border-color:var(--bad);background:var(--bad-soft)}
+.opt.pick{border-color:var(--accent);background:var(--accent-soft);color:var(--fg)}
+.opt:disabled{cursor:default}
+.fb{font-size:14px;border-radius:8px;padding:10px 12px}
+.fb.good{background:var(--good-soft)}
+.fb.good b{color:var(--good)}
+.fb.bad{background:var(--bad-soft)}
+.fb.bad b{color:var(--bad)}
+.fb.neutral{background:var(--accent-soft)}
+.ev{display:inline-block;margin-top:4px;font-size:12.5px;font-weight:600;color:var(--accent)}
+.shake{animation:sh .32s}
+@keyframes sh{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);border-radius:8px;padding:9px 16px;font-weight:600}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.nav{display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line-soft);padding-top:16px}
+
+.timer{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--surface);border-radius:10px;padding:16px}
+.clock{font-size:44px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.02em;min-width:4ch}
+.clock.end{color:var(--bad)}
+.rules{margin:0;padding-left:18px;color:var(--muted);font-size:14px}
+
+.match{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 12px}
+.mcol{display:flex;flex-direction:column;gap:8px}
+.chip{border:1px solid var(--line);background:var(--raise);border-radius:8px;padding:10px 12px;text-align:left;min-height:44px;transition:all .15s}
+.chip.en{font-weight:600}
+.chip.sel{border-color:var(--accent);background:var(--accent-soft)}
+.chip.gone{border-color:var(--good);background:var(--good-soft);color:var(--good);cursor:default}
+.chip.no{border-color:var(--bad);background:var(--bad-soft)}
+.mstat{display:flex;gap:16px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.mstat b{color:var(--fg)}
+
+.bank{display:flex;flex-wrap:wrap;gap:8px;padding:12px;background:var(--surface);border-radius:10px}
+.word{border:1px solid var(--line);background:var(--raise);border-radius:999px;padding:6px 14px;font-weight:600;font-size:14px}
+.word.used{opacity:.35}
+.sent{line-height:2.1}
+.blank{display:inline-block;min-width:8.5em;border:0;border-bottom:2px solid var(--line);background:transparent;padding:0 6px;text-align:center;font-weight:600;color:var(--accent)}
+.blank.act{border-color:var(--accent);background:var(--accent-soft)}
+.blank.ok{border-color:var(--good);color:var(--good)}
+.blank.no{border-color:var(--bad);color:var(--bad)}
+
+.build{min-height:52px;border:1px dashed var(--line);border-radius:10px;padding:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.build.ok{border-style:solid;border-color:var(--good);background:var(--good-soft)}
+.build:empty::before{content:"點下面的詞塊，依序排成句子";color:var(--muted);font-size:13px;padding-left:4px}
+.piece{border:1px solid var(--line);background:var(--raise);border-radius:6px;padding:6px 10px;font-size:14.5px}
+.piece.role-s{border-bottom:3px solid var(--accent)}
+.legend{font-size:13px;color:var(--muted)}
+
+.reveal{background:var(--surface);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.reveal p{margin:0}
+textarea,.qi{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--raise);padding:10px 12px;font:inherit;color:var(--fg)}
+textarea{min-height:76px;resize:vertical}
+.made{border:1px solid var(--accent);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.made .lbl{font-size:12px;font-weight:600;color:var(--accent);letter-spacing:.04em}
+
+.sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.tile{background:var(--surface);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:2px}
+.tile .v{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.tile .l{font-size:12px;color:var(--muted)}
+.multi{display:flex;flex-wrap:wrap;gap:8px}
+.tog{border:1px solid var(--line);background:var(--raise);border-radius:999px;padding:6px 14px;font-size:14px}
+.tog[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--on-accent)}
+.foot{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.linkish{border:0;background:none;color:var(--muted);text-decoration:underline;padding:0;font-size:12px}
+@media (max-width:520px){.sum{grid-template-columns:1fr 1fr}.segs{gap:3px}.seg{font-size:10px}.clock{font-size:36px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+
+<div class="bar">
+  <div class="bar-in">
+    <div class="bar-top">
+      <div class="kicker">龍騰版 高中英文 第三冊 · 閱讀素養專欄 · A Hero, Hidden</div>
+      <div class="stats">
+        <span class="pct" id="pct">0 / 9 關</span>
+        <span class="xp" id="xp">0 XP</span>
+        <button class="tbtn" id="teach" aria-pressed="false">教師提示</button>
+      </div>
+    </div>
+    <div class="segs" id="segs" role="tablist" aria-label="關卡進度"></div>
+  </div>
+</div>
+
+<main>
+  <div class="wrap">
+    <div class="hero">
+      <h1>A Hero, Hidden</h1>
+      <div class="sub">被藏起來的英雄 · 9 關 · 每關計 XP</div>
+      <div class="who"><label for="nm">Player</label><input id="nm" placeholder="名字" maxlength="12"></div>
+    </div>
+    <section class="mission" id="stage" aria-live="polite"></section>
+    <div class="foot"><span><a href="../" style="color:var(--muted)">← 所有課程</a> · 課文請看課本，這裡只放練習。</span><span id="resetArea"><button class="linkish" id="reset">重新開始</button></span></div>
+  </div>
+</main>
+
+<script>
+(function(){
+const KEY='hero-hidden-v2';
+let S={cur:0,xp:0,done:{},solved:{},name:'',bestMatch:null,likes:[],dislikes:[],note:''};
+try{const raw=localStorage.getItem(KEY);if(raw)S=Object.assign(S,JSON.parse(raw));}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}};
+let teacher=false;
+const $=(s,r=document)=>r.querySelector(s);
+const el=(t,a={},...kids)=>{const n=document.createElement(t);for(const k in a){if(k==='class')n.className=a[k];else if(k==='html')n.innerHTML=a[k];else if(k.startsWith('on'))n.addEventListener(k.slice(2),a[k]);else n.setAttribute(k,a[k]);}kids.flat().forEach(c=>{if(c!=null)n.append(c.nodeType?c:document.createTextNode(c));});return n;};
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+const L='ABCDE';
+
+function addXP(n){S.xp+=n;save();paintBar();}
+function markDone(i){if(!S.done[i]){S.done[i]=true;save();paintBar();}}
+
+/* ---------- multiple choice ---------- */
+function mc(id,{q,opts,ans,ok,ev,hint,n,predict}){
+  const box=el('div',{class:'q'});
+  box.append(el('div',{class:'qt'},n?el('span',{class:'n'},n):null,el('span',{},q)));
+  const list=el('div',{class:'opts'}), fb=el('div');
+  let tries=0;
+  const prev=S.solved[id];
+  opts.forEach((o,i)=>{
+    const b=el('button',{class:'opt'},el('span',{class:'k'},L[i]),el('span',{},o));
+    b.addEventListener('click',()=>{
+      if(predict){
+        [...list.children].forEach(c=>{c.classList.remove('pick');c.disabled=true;});
+        b.classList.add('pick');
+        if(S.solved[id]===undefined){S.solved[id]=i;addXP(5);}
+        fb.className='fb neutral';fb.innerHTML='<b>預測已鎖定。</b> 第 8 關揭曉。';
+        box.dispatchEvent(new Event('solved'));return;
+      }
+      tries++;
+      if(i===ans){
+        [...list.children].forEach(c=>c.disabled=true);
+        b.classList.add('ok');
+        if(S.solved[id]===undefined){S.solved[id]=i;addXP(tries===1?10:4);}
+        fb.className='fb good';fb.innerHTML='<b>'+(tries===1?'PERFECT +10 XP':'CLEAR +4 XP')+'</b> '+(ok||'')+(ev?'<br><span class="ev">證據：課本第 '+ev+' 行</span>':'');
+        box.dispatchEvent(new Event('solved'));
+      }else{
+        b.classList.add('no');b.disabled=true;b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');
+        fb.className='fb bad';fb.innerHTML='<b>MISS</b> '+(hint||'回課本找證據。');
+      }
+    });
+    list.append(b);
+  });
+  box.append(list,fb);
+  if(prev!==undefined){
+    [...list.children].forEach(c=>c.disabled=true);
+    const b=list.children[prev];
+    if(predict){b.classList.add('pick');fb.className='fb neutral';fb.innerHTML='<b>你的預測：'+L[prev]+'</b>';}
+    else{b.classList.add('ok');fb.className='fb good';fb.innerHTML='<b>CLEAR</b> '+(ok||'')+(ev?'<br><span class="ev">證據：課本第 '+ev+' 行</span>':'');}
+    box.dataset.solved='1';
+  }
+  box.addEventListener('solved',()=>box.dataset.solved='1');
+  return box;
+}
+function watch(boxes,i,onAll){
+  const check=()=>{if(boxes.every(b=>b.dataset.solved)){markDone(i);onAll&&onAll();}};
+  boxes.forEach(b=>b.addEventListener('solved',()=>setTimeout(check)));check();
+}
+
+/* ---------- stages ---------- */
+const VOCAB=[
+ ['myth','n.','MITH','神話','Many myths explain how the world began.'],
+ ['legendary','adj.','LEJ-uhn-dair-ee','傳奇的；傳說的','He became a legendary player in the game’s history.'],
+ ['warrior','n.','WOR-ee-er','戰士；勇士','The warrior fought to protect his village.'],
+ ['combat','n.','KOM-bat','戰鬥','The soldiers were trained for combat.'],
+ ['prophecy','n.','PROF-uh-see','預言','The prophecy said the city would fall.'],
+ ['overshadow','v.','oh-ver-SHAD-oh','使蒙上陰影；使相形見絀','Her success was overshadowed by an injury.'],
+ ['destined','adj.','DES-tind','注定的','He seemed destined to win from the start.'],
+ ['disguise','v.','dis-GYZE','偽裝；喬裝','She disguised herself with a hat and glasses.'],
+ ['devise','v.','dih-VYZE','想出；設計','We devised a plan to finish the project early.'],
+ ['array','n.','uh-RAY','一系列；大量','The shop offers an array of drinks.'],
+ ['shield','n.','SHEELD','盾牌；保護','He raised his shield to block the arrow.']
+];
+function say(w){try{const u=new SpeechSynthesisUtterance(w);u.lang='en-US';u.rate=.85;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
+const STAGES=[
+{short:'單字',title:'單字預習',sub:'11 個本課關鍵字。先自己唸、猜意思，再點開卡片確認。全部翻開即過關。',
+ tip:['約 5 分鐘。讓他照大寫音節唸一次，重音唸錯就請他按「播放」對照。','翻卡前先問他猜什麼意思，猜對或猜錯都可以，重點是先動腦。'],
+ render(box,i){
+  box.append(el('div',{class:'vkey'},'發音標示：',el('b',{},'大寫藍字'),' 是重音節。例如 dis-',el('b',{},'GYZE'),'，重音在第二音節。'));
+  const seen=S.solved.vocab||{};const grid=el('div',{class:'vgrid'});const cnt=el('div',{class:'mstat'});
+  const paint=()=>{const n=Object.keys(seen).length;cnt.innerHTML='已翻開 <b>'+n+' / '+VOCAB.length+'</b>';if(n===VOCAB.length)markDone(i);};
+  VOCAB.forEach(([w,pos,r,zh,ex])=>{
+    const resp=el('div',{class:'vr'});r.split('-').forEach((p,k)=>{if(k)resp.append('-');p===p.toUpperCase()?resp.append(el('b',{},p)):resp.append(p.toLowerCase());});
+    const back=el('div',{class:'vb'},el('span',{class:'zh'},zh),el('span',{class:'ex'},ex));
+    const hint=el('div',{class:'vhint'},'點擊翻開');
+    const card=el('div',{class:'vcard'});
+    const flip=el('button',{class:'vflip','aria-expanded':'false'},el('div',{class:'vtop'},el('span',{class:'vw'},w),el('span',{class:'vp'},pos)),resp,back,hint);
+    const show=on=>{back.hidden=!on;hint.hidden=on;card.classList.toggle('on',on);flip.setAttribute('aria-expanded',on);};
+    show(!!seen[w]);
+    flip.addEventListener('click',()=>{const on=back.hidden;show(on);if(on&&!seen[w]){seen[w]=1;S.solved.vocab=seen;addXP(2);paint();}});
+    card.append(flip,el('button',{class:'vplay',onclick:()=>say(w)},'播放發音'));
+    grid.append(card);
+  });
+  box.append(cnt,grid);paint();
+ }},
+{short:'預測',title:'先猜再讀',sub:'還不要翻課本內文。只看標題和那幅畫。',
+ tip:['約 3 分鐘。這關沒有標準答案，重點是讓他帶著問題去讀。','問完等 5–10 秒，不要急著給提示。'],
+ render(box,i){
+  box.append(el('div',{class:'book'},'看課本：',el('b',{},'標題 A Hero, Hidden'),'和上方的油畫'));
+  const a=mc('p1',{n:'1',predict:true,q:'畫中間的人正在一箱禮物裡翻東西。你覺得這篇故事會講什麼？',opts:['一位英雄假扮成別人，躲起來不想被找到','一位國王把寶物分給女兒們','一場戰爭結束後的慶功宴']});
+  const b=mc('p2',{n:'2',predict:true,q:'如果有個英雄「被藏起來」，你覺得是誰把他藏起來？',opts:['他自己，因為他怕打仗','他的家人，想保護他','敵人，想讓他不能參戰']});
+  box.append(a,b);watch([a,b],i);
+ }},
+{short:'略讀',title:'限時略讀',sub:'讀完全文，抓大意就好。',
+ tip:['3 分鐘。禁止查字典、禁止停下來翻譯，這是學測閱讀最需要的能力。','讀完先讓他用一句中文說大意，再做下面的選擇題。'],
+ render(box,i){
+  box.append(el('div',{class:'book'},'翻開課本，讀 ',el('b',{},'第 1–28 行'),'（到 sat back and waited 為止）'));
+  box.append(el('ul',{class:'rules'},el('li',{},'不查字典，看不懂的字先跳過'),el('li',{},'不要回頭重讀'),el('li',{},'提早完成有時間加成')));
+  let t=180,iv=null,started=false;const clock=el('div',{class:'clock'},'3:00');
+  const fmt=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+  const go=el('button',{class:'btn'},'開始計時');
+  const fin=el('button',{class:'btn ghost',disabled:''},'完成');
+  const qwrap=el('div');
+  const showQ=()=>{
+    const q=mc('s1',{n:'',q:'用一句話說，這篇在講什麼？',opts:['阿基里斯從小就想當國王，最後真的當上了','阿基里斯的媽媽為了讓他躲過戰爭而把他藏起來，奧德修斯設計要找出他','奧德修斯在特洛伊戰爭中打敗了阿基里斯','國王的女兒們送禮物給希臘將領'],ans:1,ok:'主軸：藏人與找人。',hint:'誰被藏起來？誰在找他？'});
+    qwrap.replaceChildren(q);watch([q],i);
+  };
+  go.addEventListener('click',()=>{
+    if(started)return;started=true;go.disabled=true;fin.disabled=false;
+    iv=setInterval(()=>{t--;clock.textContent=fmt(Math.max(t,0));if(t<=0){clearInterval(iv);clock.classList.add('end');clock.textContent='0:00';fin.textContent='時間到，繼續';}},1000);
+  });
+  fin.addEventListener('click',()=>{
+    clearInterval(iv);fin.disabled=true;
+    if(S.solved.skim===undefined){const bonus=t>60?15:t>0?10:5;S.solved.skim=t;addXP(bonus);
+      clock.textContent=t>0?'剩 '+fmt(t)+'，+'+bonus+' XP':'+5 XP';}
+    showQ();
+  });
+  if(S.solved.skim!==undefined){go.disabled=true;clock.textContent='已完成';showQ();}
+  box.append(el('div',{class:'timer'},clock,el('div',{class:'row'},go,fin)),qwrap);
+ }},
+{short:'細讀',title:'偵探任務',sub:'每題都要能在課本裡找到證據。答對會顯示證據在哪幾行。',
+ tip:['約 10 分鐘。答錯時不要直接講答案，問他「你是看哪一句選的？」','第 4 題是推論題，學測最常錯的類型，可以多停一下。'],
+ render(box,i){
+  const qs=[
+   mc('d1',{n:'1.',q:'What is the passage mainly about?',opts:['How the Greeks won the Trojan War','How Achilles almost did not join the Trojan War','Why Odysseus was the greatest warrior','What life was like on the island of Skyros'],ans:1,ok:'主旨題通常看第一段最後一句。',ev:'6–7',hint:'主旨題：看第一段最後一句的 Yet…'}),
+   mc('d2',{n:'2.',q:'Why did Achilles’ mother hide him?',opts:['He was too young to fight.','He refused to obey the Greek leaders.','A prophecy said he would die if he fought at Troy.','The king’s daughters asked her to.'],ans:2,ok:'prophecy 就是「預言」。',ev:'10–13',hint:'找 prophecy 這個字附近的句子。'}),
+   mc('d3',{n:'3.',q:'How was Achilles hidden on Skyros?',opts:['He worked as a guard for the king.','He dressed as a woman and lived among the king’s daughters.','He hid on a ship near the island.','He changed his name and became a musician.'],ans:1,ok:'disguised in women’s clothing = 穿女裝偽裝。',ev:'14–18',hint:'找 disguised 這個字。'}),
+   mc('d4',{n:'4.',q:'Why did Odysseus include a sword and shield among the gifts?',opts:['He wanted to give the king a present.','He planned to attack the island.','He guessed a true warrior would not be able to ignore weapons.','The daughters had asked for them.'],ans:2,ok:'這是推論題，課文沒有直接寫，要從 suspecting 和 brilliant plan 推出來。',ev:'22–28',hint:'課文沒有直接寫答案。想想看：禮物裡只有它們跟「女生」不搭。'}),
+   mc('d5',{n:'5.',q:'In line 11, "a troubling prophecy overshadowed his future" means the prophecy ___.',opts:['made his future look dark and worrying','made his future brighter','was forgotten by everyone','was written by Achilles'],ans:0,ok:'overshadow 字面是「蓋上陰影」，引申為讓事情蒙上陰影。',ev:'10–11',hint:'shadow 是影子。被影子蓋住會怎樣？'})
+  ];
+  qs.forEach(q=>box.append(q));watch(qs,i);
+ }},
+{short:'配對',title:'單字配對賽',sub:'點一個英文，再點它的中文。全部配完會記錄你的時間。',
+ tip:['約 5 分鐘。可以玩兩次，第二次通常會快很多，讓他看到進步。','這 8 個字都是大考詞彙（課本有 * 號），可以問他記最快的是哪個、為什麼。'],
+ render(box,i){
+  const W=[['myth','神話'],['legendary','傳奇的'],['warrior','戰士'],['combat','戰鬥'],['prophecy','預言'],['disguise','偽裝；喬裝'],['devise','想出；設計'],['shield','盾牌；保護']];
+  const stat=el('div',{class:'mstat'});
+  let selEn=null,selZh=null,matched=0,miss=0,t0=null,tick=null;
+  const showStat=(extra)=>{const s=t0?((Date.now()-t0)/1000).toFixed(1):'0.0';stat.innerHTML='時間 <b>'+s+' 秒</b><span>錯誤 <b>'+miss+'</b></span><span>最佳紀錄 <b>'+(S.bestMatch?S.bestMatch.toFixed(1)+' 秒':'—')+'</b></span>'+(extra||'');};
+  const grid=el('div',{class:'match'}),cEn=el('div',{class:'mcol'}),cZh=el('div',{class:'mcol'});
+  const again=el('button',{class:'btn ghost'},'重玩');
+  function build(){
+    selEn=selZh=null;matched=0;miss=0;t0=null;clearInterval(tick);
+    cEn.replaceChildren();cZh.replaceChildren();
+    shuffle(W).forEach(([en])=>cEn.append(mk(en,'en')));
+    shuffle(W).forEach(([,zh])=>cZh.append(mk(zh,'zh')));
+    showStat();
+  }
+  function mk(txt,side){
+    const b=el('button',{class:'chip '+side},txt);b.dataset.v=txt;
+    b.addEventListener('click',()=>{
+      if(b.classList.contains('gone'))return;
+      if(!t0){t0=Date.now();tick=setInterval(()=>showStat(),100);}
+      const col=side==='en'?cEn:cZh;[...col.children].forEach(c=>c.classList.remove('sel'));
+      b.classList.add('sel');if(side==='en')selEn=b;else selZh=b;
+      if(selEn&&selZh){
+        const pair=W.find(w=>w[0]===selEn.dataset.v);
+        const a=selEn,z=selZh;selEn=selZh=null;
+        if(pair[1]===z.dataset.v){
+          [a,z].forEach(x=>{x.classList.remove('sel');x.classList.add('gone');});matched++;
+          if(matched===W.length){clearInterval(tick);const sec=(Date.now()-t0)/1000;
+            const first=!S.solved.match;const rec=!S.bestMatch||sec<S.bestMatch;
+            if(rec)S.bestMatch=sec;S.solved.match=true;save();
+            addXP(first?30:(rec?10:3));markDone(i);
+            showStat('<span style="color:var(--good)"><b>'+(rec?'NEW RECORD':'CLEAR')+' +'+(first?30:(rec?10:3))+' XP</b></span>');}
+        }else{
+          miss++;[a,z].forEach(x=>{x.classList.remove('sel');x.classList.add('no');setTimeout(()=>x.classList.remove('no'),450);});
+        }
+      }
+    });
+    return b;
+  }
+  again.addEventListener('click',build);
+  grid.append(cEn,cZh);box.append(stat,grid,el('div',{class:'row'},again));build();
+  if(S.solved.match)markDone(i);
+ }},
+{short:'填空',title:'單字放對位置',sub:'先點一個空格，再點上面的單字。有兩個是多出來的。',
+ tip:['約 7 分鐘。最後兩題是本課的兩個重點句型：seem destined to V. 和 an array of N.','填錯時問他：這個空格前後是什麼詞性？'],
+ render(box,i){
+  const items=[
+   ['Nobody recognized the actor because he was ',' as an old man.','disguised'],
+   ['The coach ',' a new plan to beat the stronger team.','devised'],
+   ['In the game, you can pick up a ',' to block the enemy’s arrows.','shield'],
+   ['The night market sells ',' snacks from all over Taiwan.','an array of'],
+   ['With her talent and hard work, she seems ',' become a great pianist.','destined to'],
+   ['Many ',' heroes appear in Greek stories.','legendary']
+  ];
+  const bank=shuffle(['disguised','devised','shield','an array of','destined to','legendary','combat','overshadowed']);
+  const bankEl=el('div',{class:'bank'});const blanks=[];let act=null;
+  const st=S.solved.fill||{};
+  items.forEach(([a,b,ans],k)=>{
+    const bl=el('button',{class:'blank'},st[k]?ans:' ');bl.dataset.ans=ans;bl.dataset.k=k;
+    if(st[k]){bl.classList.add('ok');bl.disabled=true;}
+    bl.addEventListener('click',()=>{blanks.forEach(x=>x.classList.remove('act'));bl.classList.add('act');act=bl;});
+    blanks.push(bl);
+    box.append(el('div',{class:'sent'},el('b',{style:'color:var(--accent)'},(k+1)+'. '),a,bl,b));
+  });
+  const fb=el('div');
+  const nextOpen=()=>{act=blanks.find(x=>!x.disabled)||null;blanks.forEach(x=>x.classList.toggle('act',x===act));};
+  bank.forEach(w=>{
+    const c=el('button',{class:'word'},w);
+    if(Object.keys(st).some(k=>items[k][2]===w))c.classList.add('used');
+    c.addEventListener('click',()=>{
+      if(!act)nextOpen();if(!act)return;
+      if(w===act.dataset.ans){act.textContent=w;act.classList.remove('act','no');act.classList.add('ok');act.disabled=true;c.classList.add('used');
+        const s=S.solved.fill||{};s[act.dataset.k]=1;S.solved.fill=s;addXP(5);
+        fb.className='fb good';fb.innerHTML='<b>+5 XP</b>';
+        if(blanks.every(x=>x.disabled)){markDone(i);fb.innerHTML='<b>ALL CLEAR</b> 注意 destined to 後面接原形動詞，an array of 後面接複數名詞。';}
+        nextOpen();
+      }else{act.textContent=w;act.classList.add('no');const a=act;setTimeout(()=>{if(!a.disabled){a.textContent=' ';a.classList.remove('no');}},700);
+        fb.className='fb bad';fb.innerHTML='<b>MISS</b> 看空格前後的詞性。';}
+    });
+    bankEl.append(c);
+  });
+  box.prepend(bankEl);box.append(fb);nextOpen();
+  if(blanks.every(x=>x.disabled))markDone(i);
+ }},
+{short:'句構',title:'句子拼圖',sub:'把詞塊排成正確的句子。藍色底線的是主詞，先找它。',
+ tip:['約 8 分鐘。拼完後請他看課本第 8–9 行和第 16–17 行，找出跟拼圖一樣結構的句子。','重點：分詞構句 Disguised in…, S + V（被偽裝的人就是主詞）。'],
+ render(box,i){
+  const P=[
+   {id:'b1',zh:'從很小的時候起，她似乎就注定要成為一名科學家。',parts:['From an early age,','she','seemed','destined to','become','a scientist.'],subj:1},
+   {id:'b2',zh:'偽裝成觀光客，那位警探跟蹤了嫌犯。',parts:['Disguised as a tourist,','the detective','followed','the suspect.'],subj:1},
+   {id:'b3',zh:'懷疑寶藏被藏在那裡，他想出了一個聰明的計畫。',parts:['Suspecting that','the treasure','was hidden there,','he','devised','a clever plan.'],subj:3}
+  ];
+  const boxes=[];
+  P.forEach((p,k)=>{
+    const q=el('div',{class:'q'});q.append(el('div',{class:'qt'},el('span',{class:'n'},(k+1)+'.'),el('span',{},p.zh)));
+    const buildEl=el('div',{class:'build'}),pool=el('div',{class:'row'}),fb=el('div');
+    const done=!!S.solved[p.id];
+    const mkp=(idx)=>{const b=el('button',{class:'piece'+(idx===p.subj?' role-s':'')},p.parts[idx]);b.dataset.i=idx;return b;};
+    if(done){p.parts.forEach((_,j)=>buildEl.append(mkp(j)));buildEl.classList.add('ok');[...buildEl.children].forEach(c=>c.disabled=true);q.dataset.solved='1';fb.className='fb good';fb.innerHTML='<b>CLEAR</b>';}
+    else{
+      let tries=0;
+      shuffle(p.parts.map((_,j)=>j)).forEach(j=>{const b=mkp(j);
+        b.addEventListener('click',()=>{(b.parentNode===pool?buildEl:pool).append(b);
+          if(!pool.children.length){tries++;const order=[...buildEl.children].map(c=>+c.dataset.i);
+            if(order.every((v,x)=>v===x)){buildEl.classList.add('ok');[...buildEl.children].forEach(c=>c.disabled=true);
+              S.solved[p.id]=1;addXP(tries===1?15:8);fb.className='fb good';fb.innerHTML='<b>'+(tries===1?'PERFECT +15 XP':'CLEAR +8 XP')+'</b>';q.dispatchEvent(new Event('solved'));q.dataset.solved='1';}
+            else{fb.className='fb bad';fb.innerHTML='<b>MISS</b> 點已放入的詞塊可收回。先找主詞和動詞。';}
+          }else{fb.className='';fb.textContent='';}
+        });pool.append(b);});
+    }
+    q.append(buildEl,pool,fb);box.append(q);boxes.push(q);
+  });
+  box.append(el('div',{class:'legend'},'拼完後回課本：第 8–9 行、第 16–17 行、第 23–24 行，各有一句跟這三題一樣的結構。'));
+  watch(boxes,i);
+ }},
+{short:'結局',title:'結局揭曉',sub:'課文停在 Then he sat back and waited… 接下來發生什麼？',
+ tip:['約 5 分鐘。先讓他選，再對照第 2 關的預測。','Achilles’ heel 是常見片語，閱讀和翻譯都可能出現。'],
+ render(box,i){
+  const p=mc('e1',{n:'1.',predict:true,q:'你覺得接下來發生什麼事？',opts:['國王很生氣，把奧德修斯趕走','阿基里斯忍住不碰武器，奧德修斯空手而回','阿基里斯一看到劍和盾就拿起來，身分被拆穿','國王的一個女兒拿走武器，被誤認成阿基里斯']});
+  const rv=el('div',{class:'reveal'});
+  const showR=()=>{rv.replaceChildren(
+    el('p',{},el('b',{style:'color:var(--accent)'},'神話裡的結局是 C。')),
+    el('p',{},'公主們都去挑衣服和珠寶，只有一個「女孩」直接抓起了劍和盾。有些版本還說，奧德修斯故意讓號角突然響起，假裝敵人來襲，阿基里斯本能地拿起武器準備戰鬥。'),
+    el('p',{},'身分被拆穿後，阿基里斯跟著希臘大軍去了特洛伊，成為最強的戰士。可是預言還是成真了：他在戰場上被一箭射中腳後跟而死，因為那是他全身唯一的弱點。'),
+    el('p',{style:'color:var(--muted);font-size:14px'},'第 2 關預測：'+(S.solved.p1!==undefined?L[S.solved.p1]+(S.solved.p1===0?'（命中）':''):'未作答')));
+    if(!rv.parentNode)box.insertBefore(rv,h);
+  };
+  const h=mc('e2',{n:'2.',q:'所以英文的 "Achilles’ heel" 是什麼意思？\n例：Math is my Achilles’ heel.',opts:['最強的武器','唯一的弱點','跑得很快的人','一個祕密計畫'],ans:1,ok:'Achilles’ heel = 致命的弱點。',hint:'他是怎麼死的？'});
+  p.addEventListener('solved',showR);
+  box.append(p,h);if(S.solved.e1!==undefined)showR();
+  watch([p,h],i);
+ }},
+{short:'結算',title:'今日結算',sub:'學測閱讀題考的就是今天做的事：抓主旨、找證據、推論、看懂長句。',
+ tip:['約 3 分鐘。下面兩題的結果，是下次調整上課方式的依據。'],
+ render(box,i){
+  markDone(i);
+  /* wrap-up */
+  const doneN=()=>Object.keys(S.done).length;
+  const sum=el('div',{class:'sum'});
+  const paintSum=()=>sum.replaceChildren(
+    el('div',{class:'tile'},el('span',{class:'v'},S.xp+''),el('span',{class:'l'},'今天的 XP')),
+    el('div',{class:'tile'},el('span',{class:'v'},doneN()+' / '+STAGES.length),el('span',{class:'l'},'完成關卡')),
+    el('div',{class:'tile'},el('span',{class:'v'},S.bestMatch?S.bestMatch.toFixed(1)+'s':'—'),el('span',{class:'l'},'配對最佳紀錄')));
+  paintSum();document.addEventListener('xp',paintSum);
+  const vote=(key,label)=>{const m=el('div',{class:'multi'});STAGES.slice(0,-1).forEach((s,k)=>{const b=el('button',{class:'tog','aria-pressed':S[key].includes(k)?'true':'false'},s.short);
+    b.addEventListener('click',()=>{const a=S[key],x=a.indexOf(k);x<0?a.push(k):a.splice(x,1);b.setAttribute('aria-pressed',x<0?'true':'false');save();});m.append(b);});
+    return el('div',{class:'q'},el('div',{class:'qt'},label),m);};
+  const note=el('textarea',{id:'note',placeholder:'給老師的回饋（選填）'});note.value=S.note||'';note.addEventListener('input',()=>{S.note=note.value;save();});
+  box.append(sum,vote('likes','哪幾關還不錯？（可複選）'),vote('dislikes','哪幾關最無聊？（可複選）'),note);
+ }}
+];
+
+/* ---------- shell ---------- */
+function paintBar(){
+  const segs=$('#segs');segs.replaceChildren();
+  STAGES.forEach((s,k)=>{const b=el('button',{class:'seg'+(S.done[k]?' done':'')+(k===S.cur?' cur':''),role:'tab','aria-selected':k===S.cur?'true':'false',title:s.title},(k+1)+' '+s.short);
+    b.addEventListener('click',()=>go(k));segs.append(b);});
+  $('#pct').textContent=Object.keys(S.done).length+' / '+STAGES.length+' 關';
+  $('#xp').textContent=S.xp+' XP';
+  document.dispatchEvent(new Event('xp'));
+}
+function go(k){S.cur=k;save();render();window.scrollTo({top:0,behavior:'smooth'});}
+function render(){
+  const s=STAGES[S.cur],box=$('#stage');box.replaceChildren();
+  box.append(el('div',{class:'mhead'},el('div',{class:'badge'},(S.cur+1)+''),el('div',{},el('h2',{},'第 '+(S.cur+1)+' 關 · '+s.title),el('p',{},s.sub))));
+  if(teacher)box.append(el('div',{class:'tip'},el('strong',{},'教師提示'),el('ul',{},...s.tip.map(t=>el('li',{},t)))));
+  const body=el('div',{style:'display:flex;flex-direction:column;gap:14px'});box.append(body);s.render(body,S.cur);
+  const prev=el('button',{class:'btn ghost'},'上一關'),LAST=STAGES.length-1,next=el('button',{class:'btn'},S.cur===LAST?'回到第 1 關':'下一關');
+  if(S.cur===0)prev.disabled=true;
+  prev.addEventListener('click',()=>go(S.cur-1));next.addEventListener('click',()=>go(S.cur===LAST?0:S.cur+1));
+  box.append(el('div',{class:'nav'},prev,next));
+  paintBar();
+}
+const nm=$('#nm');nm.value=S.name||'';nm.addEventListener('input',()=>{S.name=nm.value.trim();save();});
+const tb=$('#teach');tb.addEventListener('click',()=>{teacher=!teacher;tb.setAttribute('aria-pressed',teacher);render();});
+$('#reset').addEventListener('click',()=>{
+  const area=$('#resetArea');area.replaceChildren('確定清除所有進度？ ',
+    el('button',{class:'linkish',onclick:()=>{S={cur:0,xp:0,done:{},solved:{},name:S.name,bestMatch:null,likes:[],dislikes:[],note:''};save();location.reload();}},'確定'),' · ',
+    el('button',{class:'linkish',onclick:()=>location.reload()},'取消'));
+});
+render();
+})();
+</script>
+
+</body></html>
