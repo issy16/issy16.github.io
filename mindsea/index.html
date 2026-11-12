@@ -216,8 +216,6 @@ body.dragging, body.dragging .node { cursor: grabbing; }
   background: repeating-linear-gradient(to bottom, var(--line) 0 1.5px, transparent 1.5px 9%) left / 8px 100% no-repeat,
               repeating-linear-gradient(to bottom, var(--line-soft) 0 1px, transparent 1px 1.8%) left / 4px 100% no-repeat;
 }
-.gauge-ends { position: absolute; left: 10px; font-family: var(--label); font-size: 9px; color: var(--muted); letter-spacing: .06em; }
-.gauge-ends.top { top: -16px; } .gauge-ends.bot { bottom: -16px; }
 .gauge-mark { position: absolute; left: -2px; top: 0; transform: translateY(-50%); display: flex; align-items: center; gap: 4px; }
 .gauge-mark::before { content: ""; width: 0; height: 0; border-left: 8px solid var(--pink); border-top: 5px solid transparent; border-bottom: 5px solid transparent; filter: drop-shadow(0 0 4px var(--pink)); }
 .gauge-mark span { position: absolute; right: 16px; font-family: var(--label); font-size: 10px; color: var(--pink-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -294,7 +292,6 @@ body.diving #grid { opacity: .25; }
 
 @media (max-width: 640px) {
   .gauge { height: min(34vh, 240px); width: 22px; }
-  .gauge-ends { display: none; }
   .brand .mapname { display: none; }
   .key kbd { display: none; }
   .menu .key { padding: 5px 8px; font-size: 11px; }
@@ -339,9 +336,7 @@ body.diving #grid { opacity: .25; }
 </header>
 
 <div class="gauge" aria-hidden="true">
-  <span class="gauge-ends top">0 M</span>
-  <span class="gauge-ends bot">600 M</span>
-  <div class="gauge-mark" id="gaugeMark"><span id="gaugeTxt">0 M</span></div>
+  <div class="gauge-mark" id="gaugeMark"></div>
 </div>
 
 <section class="dock panel chrome" aria-label="Node tools">
@@ -1289,12 +1284,8 @@ body.diving #grid { opacity: .25; }
     vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(0,1,4,${.35 + .4 * k + (diving ? .2 : 0)})`);
     ctx.fillStyle = vg; ctx.fillRect(0, 0, W, Hh);
 
-    const dt = Math.round(depthShown) + ' M';
-    if (dt !== lastDepthTxt) {
-      lastDepthTxt = dt;
-      $('#gaugeTxt').textContent = dt;
-      $('#gaugeMark').style.top = (k * 100).toFixed(1) + '%';
-    }
+    const pos = (k * 100).toFixed(1) + '%';
+    if (pos !== lastDepthTxt) { lastDepthTxt = pos; $('#gaugeMark').style.top = pos; }
   }
 
   /* ---------- main loop ---------- */
