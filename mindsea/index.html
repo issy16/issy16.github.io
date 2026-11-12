@@ -467,7 +467,7 @@ body.diving #grid { opacity: .25; }
       <dt>Drag an idea</dt><dd>Move it with its branches</dd>
       <dt>Drop on another idea</dt><dd>Re-attach it there</dd>
       <dt>Tap the +N badge</dt><dd>Unfold hidden branches</dd>
-      <dt>Tap a link</dt><dd>Change its arrows, label or delete it</dd>
+      <dt>Tap a link</dt><dd>Change its arrows, label or delete it. Double-click the line to name it</dd>
     </dl>
     <button class="key mclose" type="button" data-close>Close</button>
   </div>
@@ -991,7 +991,7 @@ body.diving #grid { opacity: .25; }
       const shown = vis.has(l.a) && vis.has(l.b);
       const dim = !!diving && !(focusSet.has(l.a) && focusSet.has(l.b));
       const on = l.id === selLink;
-      lv.hidden = !shown; lv.path.style.display = shown ? '' : 'none'; lv.label.hidden = !shown;
+      lv.hidden = !shown; lv.path.style.display = shown ? '' : 'none'; lv.label.hidden = !shown || (!l.label && labelEditing !== l.id);
       lv.path.classList.toggle('sel', on); lv.label.classList.toggle('sel', on);
       lv.path.classList.toggle('dim', dim); lv.label.classList.toggle('dim', dim);
       lv.path.classList.toggle('to', l.dir === 'to');
@@ -1079,7 +1079,7 @@ body.diving #grid { opacity: .25; }
     if (labelEditing && labelEditing !== lid) commitLabel();
     labelEditing = lid; labelIsNew = isNew; labelOld = l.label || ''; selLink = lid; sel = null;
     $('#linkBar').hidden = true;
-    lv.label.classList.add('editing'); lv.label.classList.remove('glyph');
+    lv.label.hidden = false; lv.label.classList.add('editing'); lv.label.classList.remove('glyph');
     lv.txt.textContent = l.label || '';
     lv.txt.contentEditable = plainOK ? 'plaintext-only' : 'true';
     lv.txt.focus({ preventScroll: true });
@@ -1094,7 +1094,7 @@ body.diving #grid { opacity: .25; }
     labelEditing = null;
     if (lv) {
       lv.txt.contentEditable = 'false'; lv.label.classList.remove('editing');
-      const text = (lv.txt.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+      const text = (lv.txt.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
       if (l && !cancel && text !== labelOld) { if (!labelIsNew) snap(); l.label = text; }
       lv.txt.blur();
     }
@@ -1396,7 +1396,12 @@ body.diving #grid { opacity: .25; }
         gesture = { type: 'box', sx: e.clientX, sy: e.clientY, base: e.shiftKey ? new Set(msel) : new Set(), hits: [], moved: false };
         return;
       }
-      if (hit) selectLink(hit);
+      if (hit) {
+        selectLink(hit);
+        const now = performance.now();
+        if (lastTap.id === 'L' + hit && now - lastTap.t < 380) { lastTap = {}; e.preventDefault(); setTimeout(() => editLabel(hit), 30); }
+        else lastTap = { id: 'L' + hit, t: now };
+      }
       gesture = { type: 'pan', sx: e.clientX, sy: e.clientY, cx: cam.x, cy: cam.y, moved: false, link: hit };
     }
   });
