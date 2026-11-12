@@ -1,0 +1,1850 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Mindsea: a dark, deep-sea mind map maker. Branch out ideas, link opposites, and sink deeper as you zoom in.">
+<title>Mindsea</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap">
+<style>
+/* Layout: a full-bleed abyss you pan and zoom through. Pixel "music software" chrome floats on top:
+   menu bar above, node dock + transport bar below, depth gauge on the right. Zooming in = sinking deeper. */
+:root {
+  color-scheme: dark;
+  --abyss: #050914;
+  --panel: #0d1528;
+  --panel-2: #131e38;
+  --line: #2d3c60;
+  --line-soft: #1d2945;
+  --grid: rgba(128, 156, 214, .055);
+  --ink: #e8ecf8;
+  --muted: #8392b5;
+  --pink: #ff5c97;
+  --pink-ink: #ff8db6;
+  --pink-2: #a9396b;
+  --pink-3: rgba(255, 92, 151, .16);
+  --on-pink: #1c0712;
+  --sea: #53d8ea;
+  --link: #bfe6f5;
+  --label: "Silkscreen", "Courier New", monospace;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--abyss); color: var(--ink);
+  font-family: var(--body); font-size: 15px; line-height: 1.5;
+  overflow: hidden; -webkit-font-smoothing: antialiased;
+  padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+}
+:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
+button { font: inherit; color: inherit; }
+
+/* ---------- the sea ---------- */
+#seaCanvas, #grid, #stage { position: fixed; inset: 0; }
+#grid {
+  pointer-events: none;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+#stage { touch-action: none; cursor: default; overflow: hidden; }
+body.panning #stage { cursor: grabbing; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+#edges path { fill: none; stroke-linecap: round; stroke-opacity: .72; transition: stroke-opacity .3s; }
+#edges path.dim { stroke-opacity: .06; }
+
+/* ---------- nodes ---------- */
+.node {
+  --c: var(--pink);
+  position: absolute; left: 0; top: 0;
+  width: max-content; max-width: 250px; padding: 6px 11px;
+  background: color-mix(in srgb, var(--c) 11%, var(--panel));
+  border: 1.5px solid color-mix(in srgb, var(--c) 62%, transparent);
+  border-radius: 3px;
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--c) 28%, transparent);
+  color: var(--ink); font-size: 14px; line-height: 1.35;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  cursor: grab; user-select: none; -webkit-user-select: none;
+  transition: opacity .35s, filter .35s, box-shadow .15s steps(2), border-color .15s steps(2);
+  will-change: transform;
+}
+.node.l1 { font-family: var(--mono); font-weight: 600; font-size: 15px; padding: 8px 14px; }
+.node.root {
+  font-family: var(--label); font-size: 20px; letter-spacing: .04em; line-height: 1.2;
+  padding: 14px 20px; max-width: 300px; text-align: center;
+  background: var(--c); color: var(--on-pink);
+  border-color: color-mix(in srgb, var(--c) 55%, #fff);
+  box-shadow: 4px 4px 0 color-mix(in srgb, var(--c) 38%, #000), 0 0 56px color-mix(in srgb, var(--c) 42%, transparent);
+}
+.node:hover { border-color: var(--c); }
+.node.sel {
+  border-color: var(--c);
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--c) 55%, transparent), 0 0 0 3px var(--abyss), 0 0 0 4.5px var(--c), 0 0 30px color-mix(in srgb, var(--c) 45%, transparent);
+}
+.node.root.sel { box-shadow: 4px 4px 0 color-mix(in srgb, var(--c) 38%, #000), 0 0 0 3px var(--abyss), 0 0 0 4.5px var(--c), 0 0 64px color-mix(in srgb, var(--c) 55%, transparent); }
+.node.editing { cursor: text; user-select: text; -webkit-user-select: text; }
+.node .txt { display: block; outline: none; min-width: 2ch; }
+.node .txt:empty::before { content: "type a thought"; color: var(--muted); font-style: italic; }
+.node.root .txt:empty::before { color: color-mix(in srgb, var(--on-pink) 55%, transparent); }
+.node.dim { opacity: .09; filter: blur(1.5px); }
+.node.free { outline: 1.5px dashed color-mix(in srgb, var(--c) 45%, transparent); outline-offset: 5px; }
+.node.drop { outline: 2px dashed var(--sea); outline-offset: 5px; }
+.node.linksrc { outline: 2px solid var(--link); outline-offset: 5px; }
+body.linking #stage, body.linking .node, body.boxmode #stage { cursor: crosshair; }
+#marquee { position: fixed; z-index: 12; left: 0; top: 0; pointer-events: none; border: 1.5px dashed var(--pink); background: rgba(255, 92, 151, .08); box-shadow: 0 0 24px rgba(255, 92, 151, .18) inset; }
+#links path { fill: none; stroke: var(--link); stroke-width: 2; stroke-dasharray: 7 5; stroke-opacity: .85; transition: stroke-opacity .3s; }
+#links path.to { animation: current 1.4s linear infinite; }
+#links path.sel { stroke: var(--pink); stroke-opacity: 1; }
+#links path.dim { stroke-opacity: .08; }
+@keyframes current { to { stroke-dashoffset: -24; } }
+.llabel {
+  position: absolute; left: 0; top: 0; width: max-content; max-width: 200px; padding: 3px 8px;
+  font-family: var(--label); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; line-height: 1.3;
+  color: var(--link); background: var(--abyss); border: 1.5px dashed var(--link); border-radius: 3px;
+  cursor: pointer; user-select: none; -webkit-user-select: none; white-space: pre-wrap; overflow-wrap: anywhere; transition: opacity .35s;
+}
+.llabel.glyph { letter-spacing: 0; padding: 1px 6px; }
+.llabel.sel { color: var(--pink-ink); border: 1.5px solid var(--pink); box-shadow: 0 0 18px rgba(255, 92, 151, .35); }
+.llabel.editing { cursor: text; user-select: text; -webkit-user-select: text; text-transform: none; }
+.llabel .ltxt { display: block; outline: none; min-width: 3ch; }
+.llabel.editing .ltxt:empty::before { content: "opposite?"; color: var(--muted); }
+.llabel.dim { opacity: .1; }
+#linkBar { position: fixed; z-index: 22; left: 0; top: 0; display: flex; gap: 5px; align-items: center; padding: 6px; background: rgba(13, 21, 40, .94); box-shadow: 3px 3px 0 rgba(191, 230, 245, .25); }
+.linkbar .key { padding: 4px 8px; font-size: 11px; }
+body.diving .linkbar { display: none; }
+.fold {
+  position: absolute; top: 50%; right: -12px; transform: translate(50%, -50%);
+  font-family: var(--label); font-size: 10px; line-height: 1; letter-spacing: .02em;
+  padding: 3px 5px; background: var(--panel-2); color: var(--ink);
+  border: 1.5px solid var(--c); border-radius: 3px; box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 45%, transparent);
+  cursor: pointer;
+}
+.node.left .fold { right: auto; left: -12px; transform: translate(-50%, -50%); }
+body.dragging .node { transition: opacity .35s, filter .35s; }
+body.dragging, body.dragging .node { cursor: grabbing; }
+
+/* ---------- shared pixel parts ---------- */
+.panel { position: relative; background: var(--panel); border: 1.5px solid var(--line); }
+.panel-label {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-family: var(--label); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+}
+.panel-label .hot { color: var(--pink-ink); }
+.key {
+  display: inline-flex; align-items: center; gap: 7px; flex: none;
+  font-family: var(--label); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; line-height: 1.2;
+  color: var(--ink); background: var(--panel-2); border: 1.5px solid var(--line); border-radius: 4px;
+  padding: 6px 10px; text-decoration: none; box-shadow: 0 2px 0 var(--line); cursor: pointer; white-space: nowrap;
+}
+.key:hover, .key:focus-visible { background: var(--pink-3); border-color: var(--pink-2); }
+.key:active { transform: translateY(2px); box-shadow: none; }
+.key.on { background: var(--pink); border-color: var(--pink-ink); color: var(--on-pink); box-shadow: 0 2px 0 var(--pink-2); }
+.key:disabled { opacity: .35; cursor: not-allowed; transform: none; box-shadow: 0 2px 0 var(--line); background: var(--panel-2); border-color: var(--line); }
+.key kbd { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0; text-transform: none; }
+.key.on kbd { color: color-mix(in srgb, var(--on-pink) 70%, transparent); }
+.key.danger:hover:not(:disabled) { background: rgba(255, 92, 92, .16); border-color: #c4485a; }
+.dots { display: inline-flex; gap: 5px; }
+.dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--pink); }
+.dots i:nth-child(2) { background: var(--pink-2); }
+.dots i:nth-child(3) { background: var(--line); }
+
+/* ---------- top bar ---------- */
+.chrome { transition: opacity .5s, transform .5s; }
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+  padding-top: env(safe-area-inset-top, 0px);
+  background: rgba(8, 13, 26, .82); border-bottom: 1.5px solid var(--line);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.topbar-inner {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap;
+  padding-block: 10px; padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+}
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; font-family: var(--label); font-size: 14px; }
+.brand b { font-weight: 400; letter-spacing: .06em; }
+.brand .mapname { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30vw; }
+.menu { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---------- dock ---------- */
+.dock {
+  position: fixed; z-index: 20; left: 50%; transform: translateX(-50%);
+  bottom: calc(50px + env(safe-area-inset-bottom, 0px));
+  width: max-content; max-width: calc(100% - 32px);
+  padding: 8px 10px 10px; display: grid; gap: 7px;
+  background: rgba(13, 21, 40, .9); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  box-shadow: 4px 4px 0 rgba(255, 92, 151, .22);
+}
+.dock .panel-label span:last-child { max-width: 46ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; font-family: var(--mono); letter-spacing: 0; }
+.dock-row { display: flex; gap: 6px; align-items: center; overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--pink-2) transparent; padding-bottom: 3px; }
+.sep { width: 1.5px; align-self: stretch; background: var(--line-soft); flex: none; margin: 0 2px; }
+.swatches { display: flex; gap: 5px; flex: none; }
+.sw {
+  width: 22px; height: 22px; flex: none; border-radius: 3px; cursor: pointer; padding: 0;
+  background: var(--c); border: 1.5px solid color-mix(in srgb, var(--c) 60%, #000); box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 40%, #000);
+}
+.sw.on { outline: 2px solid var(--ink); outline-offset: 2px; }
+.sw:disabled { opacity: .3; cursor: not-allowed; }
+
+/* ---------- transport ---------- */
+.transport {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  display: flex; align-items: center; gap: 12px;
+  padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+  background: rgba(8, 13, 26, .9); border-top: 1.5px solid var(--line);
+  font-family: var(--label); font-size: 12px; color: var(--muted);
+}
+.transport .play { width: 0; height: 0; border-left: 10px solid var(--pink); border-top: 6px solid transparent; border-bottom: 6px solid transparent; flex: none; transform: rotate(90deg); }
+.track { position: relative; flex: 1; min-width: 40px; height: 2px; background: var(--line); }
+.track span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--pink); width: 0; }
+.track span::after { content: ""; position: absolute; right: -5px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 12px var(--pink); }
+.time { white-space: nowrap; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tstat { white-space: nowrap; }
+.tstat.warn { color: var(--pink-ink); }
+.transport .key { padding: 3px 8px; font-size: 11px; }
+
+/* ---------- depth gauge ---------- */
+.gauge {
+  position: fixed; z-index: 15; right: calc(var(--gutter-r) + 4px); top: 50%; transform: translateY(-50%);
+  height: min(44vh, 360px); width: 30px; pointer-events: none;
+  border-left: 1.5px solid var(--line);
+  background: repeating-linear-gradient(to bottom, var(--line) 0 1.5px, transparent 1.5px 9%) left / 8px 100% no-repeat,
+              repeating-linear-gradient(to bottom, var(--line-soft) 0 1px, transparent 1px 1.8%) left / 4px 100% no-repeat;
+}
+.gauge-ends { position: absolute; left: 10px; font-family: var(--label); font-size: 9px; color: var(--muted); letter-spacing: .06em; }
+.gauge-ends.top { top: -16px; } .gauge-ends.bot { bottom: -16px; }
+.gauge-mark { position: absolute; left: -2px; top: 0; transform: translateY(-50%); display: flex; align-items: center; gap: 4px; }
+.gauge-mark::before { content: ""; width: 0; height: 0; border-left: 8px solid var(--pink); border-top: 5px solid transparent; border-bottom: 5px solid transparent; filter: drop-shadow(0 0 4px var(--pink)); }
+.gauge-mark span { position: absolute; right: 16px; font-family: var(--label); font-size: 10px; color: var(--pink-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ---------- dive mode ---------- */
+.dive-hud {
+  position: fixed; z-index: 25; left: 50%; transform: translateX(-50%);
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+  opacity: 0; pointer-events: none; transition: opacity .6s; max-width: calc(100% - 32px);
+}
+.dive-hud p { margin: 0; font-family: var(--label); font-size: 11px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+.dive-hud p b { font-weight: 400; color: var(--pink-ink); }
+body.diving .dive-hud { opacity: 1; pointer-events: auto; }
+body.diving .topbar { opacity: 0; transform: translateY(-100%); pointer-events: none; }
+body.diving .dock { opacity: 0; transform: translate(-50%, 40px); pointer-events: none; }
+body.diving #grid { opacity: .25; }
+
+/* ---------- tidy menu ---------- */
+.tidymenu { position: fixed; z-index: 35; left: 0; top: 0; width: min(300px, calc(100% - 32px)); padding: 10px; display: grid; gap: 6px; background: var(--panel); box-shadow: 5px 5px 0 rgba(255, 92, 151, .28); }
+.tidymenu .panel-label span:last-child { text-transform: none; font-family: var(--mono); letter-spacing: 0; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm { display: grid; gap: 3px; text-align: left; padding: 8px 10px; background: var(--panel-2); border: 1.5px solid var(--line); border-radius: 4px; cursor: pointer; box-shadow: 0 2px 0 var(--line); }
+.tm:hover, .tm:focus-visible { background: var(--pink-3); border-color: var(--pink-2); }
+.tm:active { transform: translateY(2px); box-shadow: none; }
+.tm b { display: flex; justify-content: space-between; gap: 8px; font-family: var(--label); font-weight: 400; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; }
+.tm kbd { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0; text-transform: none; }
+.tm small { font-size: 12.5px; line-height: 1.35; color: var(--muted); }
+
+/* ---------- drawer & modals ---------- */
+.drawer {
+  position: fixed; z-index: 30; left: var(--gutter-l);
+  top: calc(70px + env(safe-area-inset-top, 0px)); bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  width: min(330px, calc(100% - 32px)); padding: 12px; display: flex; flex-direction: column; gap: 12px;
+  box-shadow: 6px 6px 0 rgba(255, 92, 151, .28);
+}
+.maplist { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; gap: 6px; align-content: start; flex: 1; min-height: 0; }
+.mapitem { display: flex; gap: 6px; align-items: stretch; }
+.mapbtn {
+  flex: 1; min-width: 0; text-align: left; cursor: pointer; padding: 8px 10px;
+  background: var(--panel-2); border: 1.5px solid var(--line); border-radius: 3px;
+}
+.mapbtn:hover { border-color: var(--pink-2); background: var(--pink-3); }
+.mapbtn.cur { border-color: var(--pink); box-shadow: 3px 3px 0 var(--pink-2); }
+.mapbtn strong { display: block; font-family: var(--mono); font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mapbtn small { display: block; font-family: var(--label); font-size: 10px; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+.mapitem .key { padding: 4px 8px; font-size: 10px; }
+.row { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.modal { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2, 4, 10, .72); }
+.mbox { width: 100%; max-width: 620px; max-height: calc(100% - 32px); overflow-y: auto; padding: 14px 18px 18px; display: grid; gap: 12px; box-shadow: 6px 6px 0 var(--pink); }
+.mbox h2 { margin: 0; font-family: var(--label); font-weight: 400; font-size: 18px; letter-spacing: .06em; text-transform: uppercase; display: flex; align-items: center; gap: 10px; text-wrap: balance; }
+.mbox h2::before { content: ""; width: 12px; height: 12px; background: var(--pink); flex: none; }
+.mbox p { margin: 0; color: var(--muted); font-size: 14px; max-width: 62ch; }
+.mbox textarea {
+  width: 100%; min-height: 180px; resize: vertical; padding: 10px;
+  background: var(--abyss); color: var(--ink); border: 1.5px solid var(--line); border-radius: 3px;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
+}
+.mbox textarea:focus { border-color: var(--pink-2); outline: none; }
+.mclose { position: absolute; top: 10px; right: 10px; }
+.shortcuts { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
+.shortcuts dt { font-family: var(--mono); font-size: 12px; color: var(--pink-ink); white-space: nowrap; }
+.shortcuts dd { margin: 0; color: var(--ink); }
+.subhead { font-family: var(--label); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 4px 0 0; }
+
+.toast {
+  position: fixed; left: 50%; z-index: 50; bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 12px); max-width: calc(100% - 32px);
+  background: var(--panel-2); color: var(--ink); font-family: var(--mono); font-size: 13px;
+  padding: 10px 16px; border: 1.5px solid var(--pink); box-shadow: 4px 4px 0 var(--pink);
+  opacity: 0; pointer-events: none; transition: opacity .2s steps(3), transform .2s steps(3);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 640px) {
+  .gauge { display: none; }
+  .brand .mapname { display: none; }
+  .key kbd { display: none; }
+  .menu .key { padding: 5px 8px; font-size: 11px; }
+  .tstat.hide-sm { display: none; }
+  .dock { bottom: calc(48px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chrome, .node, .toast, .dive-hud { transition: none; }
+  #links path.to { animation: none; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="seaCanvas" aria-hidden="true"></canvas>
+<div id="grid" aria-hidden="true"></div>
+<div id="stage" aria-label="Mind map canvas. Drag to pan, scroll or pinch to zoom.">
+  <div id="world">
+    <svg id="edges" aria-hidden="true">
+      <defs>
+        <marker id="arrN" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="11" markerHeight="11" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill: var(--link); stroke: none"/></marker>
+        <marker id="arrS" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="11" markerHeight="11" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill: var(--pink); stroke: none"/></marker>
+      </defs>
+      <g id="edgesG"></g><g id="links"></g>
+    </svg>
+  </div>
+</div>
+
+<header class="topbar chrome">
+  <div class="topbar-inner">
+    <div class="brand"><span class="dots"><i></i><i></i><i></i></span><b>MINDSEA</b><span class="mapname" id="mapName"></span></div>
+    <nav class="menu" aria-label="Map controls">
+      <button class="key" id="bMaps" type="button">Maps <kbd>M</kbd></button>
+      <button class="key" id="bTidy" type="button" aria-haspopup="menu" aria-expanded="false">Tidy ▾</button>
+      <button class="key" id="bFit" type="button">Fit <kbd>F</kbd></button>
+      <button class="key on" id="bAuto" type="button" aria-pressed="true">Auto <kbd>A</kbd></button>
+      <button class="key dl" id="bSave" type="button" title="Save this map as a file on your device">Save <kbd>⌘S</kbd></button>
+      <button class="key" id="bLog" type="button">Logbook</button>
+      <button class="key" id="bDive" type="button" aria-pressed="false">Dive <kbd>D</kbd></button>
+    </nav>
+  </div>
+</header>
+
+<div class="gauge" aria-hidden="true">
+  <span class="gauge-ends top">0 M</span>
+  <span class="gauge-ends bot">600 M</span>
+  <div class="gauge-mark" id="gaugeMark"><span id="gaugeTxt">0 M</span></div>
+</div>
+
+<section class="dock panel chrome" aria-label="Node tools">
+  <div class="panel-label"><span class="hot">Node</span><span id="dockName">Click a node to select it</span></div>
+  <div class="dock-row">
+    <button class="key on" id="bChild" type="button">+ Branch <kbd>Tab</kbd></button>
+    <button class="key" id="bSib" type="button">+ Sibling <kbd>Enter</kbd></button>
+    <button class="key" id="bParent" type="button">+ Parent <kbd>Shift Tab</kbd></button>
+    <button class="key" id="bFree" type="button">+ Free idea <kbd>N</kbd></button>
+    <button class="key" id="bLink" type="button">Link <kbd>L</kbd></button>
+    <button class="key" id="bBox" type="button" aria-pressed="false">Select area <kbd>S</kbd></button>
+    <button class="key" id="bEdit" type="button">Edit <kbd>Space</kbd></button>
+    <button class="key" id="bFold" type="button">Fold</button>
+    <button class="key" id="bUnfoldAll" type="button">Unfold all <kbd>U</kbd></button>
+    <button class="key" id="bFoldAll" type="button">Fold all <kbd>⇧U</kbd></button>
+    <span class="sep"></span>
+    <div class="swatches" id="swatches" role="group" aria-label="Branch color"></div>
+    <span class="sep"></span>
+    <button class="key" id="bUndo" type="button" aria-label="Undo">Undo</button>
+    <button class="key" id="bRedo" type="button" aria-label="Redo">Redo</button>
+    <button class="key danger" id="bDel" type="button">Delete <kbd>Del</kbd></button>
+  </div>
+</section>
+
+<footer class="transport">
+  <span class="play" aria-hidden="true"></span>
+  <span>Depth</span>
+  <div class="track" aria-hidden="true"><span id="trackFill"></span></div>
+  <span class="time" id="depthTxt">0 M</span>
+  <span class="tstat hide-sm" id="countTxt">0 nodes</span>
+  <span class="tstat hide-sm" id="saveTxt">Saved</span>
+  <button class="key" id="bHelp" type="button" aria-label="Keyboard shortcuts">?</button>
+</footer>
+
+<div class="dive-hud" aria-live="polite">
+  <p>Diving toward · <b id="diveName"></b></p>
+  <button class="key on" id="bSurface" type="button">Surface <kbd>Esc</kbd></button>
+</div>
+
+<div class="linkbar panel" id="linkBar" hidden role="toolbar" aria-label="Link tools">
+  <button class="key" type="button" data-dir="both" title="Two-way arrows">&lt;-&gt;</button>
+  <button class="key" type="button" data-dir="to" title="One-way arrow">-&gt;</button>
+  <button class="key" type="button" data-dir="none" title="No arrows">--</button>
+  <button class="key" type="button" id="bFlip">Flip</button>
+  <span class="sep"></span>
+  <button class="key" type="button" id="bLabel">Label</button>
+  <button class="key danger" type="button" id="bUnlink">Delete</button>
+</div>
+
+<div class="tidymenu panel" id="tidyMenu" hidden role="menu" aria-label="Tidy options">
+  <div class="panel-label"><span class="hot">Tidy</span><span id="tidyScope">Whole map</span></div>
+  <button class="tm" type="button" role="menuitem" data-mode="cleanup"><b>Clean up <kbd>T</kbd></b><small>Snap to the grid and fix overlaps. Keeps your layout.</small></button>
+  <button class="tm" type="button" role="menuitem" data-mode="arrange"><b>Arrange <kbd>Shift T</kbd></b><small>Lay it out fresh, branches fanning in a gentle curve.</small></button>
+  <button class="tm" type="button" role="menuitem" data-mode="sort"><b>Sort A–Z</b><small>Order each branch by name, then arrange.</small></button>
+</div>
+
+<aside class="drawer panel" id="drawer" hidden aria-label="Your maps">
+  <div class="panel-label"><span class="hot">Maps</span><span id="mapCount"></span></div>
+  <ul class="maplist" id="mapList"></ul>
+  <div class="row">
+    <button class="key on" id="bNewMap" type="button">+ New map</button>
+    <button class="key" id="bCloseDrawer" type="button">Close</button>
+  </div>
+</aside>
+
+<div class="modal" id="logModal" hidden>
+  <div class="mbox panel" role="dialog" aria-modal="true" aria-labelledby="logTitle">
+    <h2 id="logTitle">Logbook</h2>
+    <p>Your maps save automatically in this browser. To keep a copy that survives cleared browser data or moves to another device, save a file to your device. Open file reads it back in.</p>
+    <p class="subhead dl">Save to device</p>
+    <div class="row dl">
+      <button class="key on" id="bSaveMap" type="button">This map (.json)</button>
+      <button class="key" id="bSaveAll" type="button">All maps (.json)</button>
+      <button class="key" id="bSaveMd" type="button">Outline (.md)</button>
+    </div>
+    <p class="subhead">Copy or paste</p>
+    <div class="row">
+      <button class="key" id="bCopyJson" type="button">Copy JSON</button>
+      <button class="key" id="bCopyOutline" type="button">Copy outline</button>
+    </div>
+    <label class="subhead" for="logText">Text</label>
+    <textarea id="logText" spellcheck="false" placeholder="Paste a JSON backup or an outline here, e.g.&#10;Trip to Lisbon&#10;  Food&#10;    Pastel de nata&#10;  Places&#10;    Alfama"></textarea>
+    <div class="row">
+      <button class="key on" id="bLoadText" type="button">Open text as new map</button>
+      <label class="key" for="fileIn">Open file</label>
+      <input type="file" id="fileIn" accept=".json,.txt,.md,application/json,text/plain,text/markdown" hidden>
+    </div>
+    <button class="key mclose" type="button" data-close>Close</button>
+  </div>
+</div>
+
+<div class="modal" id="helpModal" hidden>
+  <div class="mbox panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <h2 id="helpTitle">Controls</h2>
+    <dl class="shortcuts">
+      <dt>Tab</dt><dd>Add a branch under the selected idea</dd>
+      <dt>Enter</dt><dd>Add a sibling (while typing: finish editing)</dd>
+      <dt>Shift + Tab</dt><dd>Insert a parent above the selected idea, or above all selected ideas on the same level</dd>
+      <dt>Shift-click · long-press</dt><dd>Select several ideas at once</dd>
+      <dt>Shift + drag the sea · S</dt><dd>Select every idea inside a box; drag any selected idea to move them all</dd>
+      <dt>N · double-click the sea</dt><dd>Add a free idea, a small map of its own</dd>
+      <dt>L</dt><dd>Link two ideas: select one, press L, then tap the other</dd>
+      <dt>Space / F2 / double-click</dt><dd>Edit the selected idea</dd>
+      <dt>Shift + Enter</dt><dd>New line while typing</dd>
+      <dt>Del / Backspace</dt><dd>Delete the idea and its branches</dd>
+      <dt>Arrow keys</dt><dd>Move between ideas</dd>
+      <dt>1 – 6</dt><dd>Color the branch</dd>
+      <dt>U · Shift + U</dt><dd>Unfold everything · Fold every main branch</dd>
+      <dt>D</dt><dd>Dive: focus one thought and let the rest fade</dd>
+      <dt>T</dt><dd>Clean up: snap to the grid and fix overlaps, keeping your layout</dd>
+      <dt>Shift + T</dt><dd>Arrange fresh. Both work around the selected idea, or the whole map when nothing is selected</dd>
+      <dt>F · A · M</dt><dd>Fit to screen · Auto-arrange · Maps</dd>
+      <dt>Ctrl/⌘ Z · Shift Z</dt><dd>Undo · Redo</dd>
+      <dt>Ctrl/⌘ S</dt><dd>Save this map as a file on your device</dd>
+    </dl>
+    <p class="subhead">Mouse &amp; touch</p>
+    <dl class="shortcuts">
+      <dt>Drag the sea</dt><dd>Pan around</dd>
+      <dt>Scroll / pinch</dt><dd>Zoom. The closer you look, the deeper you sink.</dd>
+      <dt>Drag an idea</dt><dd>Move it with its branches</dd>
+      <dt>Drop on another idea</dt><dd>Re-attach it there</dd>
+      <dt>Tap the +N badge</dt><dd>Unfold hidden branches</dd>
+      <dt>Tap a link</dt><dd>Change its arrows, label or delete it</dd>
+    </dl>
+    <button class="key mclose" type="button" data-close>Close</button>
+  </div>
+</div>
+
+<div id="marquee" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const PALETTE = [['Pink', '#ff5c97'], ['Coral', '#ff9b6e'], ['Kelp', '#7fe3a4'], ['Sea', '#53d8ea'], ['Jelly', '#ab8dff'], ['Pearl', '#e6e3f0']];
+  const KEY = 'mindsea:v1';
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const HG = 54, HG_ROOT = 78, VG = 12, VG_ROOT = 24, MAXDEPTH = 600;
+  const SVGNS = 'http://www.w3.org/2000/svg';
+
+  const stage = $('#stage'), world = $('#world'), edgesG = $('#edgesG'), gridEl = $('#grid');
+  const canvas = $('#seaCanvas'), ctx = canvas.getContext('2d');
+
+  let store = { current: null, maps: {}, auto: true };
+  let doc = null, sel = null, editing = null, editIsNew = false, editOld = '', editReturn = null;
+  let auto = true, diving = null, preDiveCam = null, focusSet = new Set();
+  let undo = [], redo = [];
+  const views = {}, paths = {}, linkViews = {};
+  let msel = new Set(), boxMode = false;
+  let selLink = null, linkFrom = null, labelEditing = null, labelIsNew = false, labelOld = '', linksDirty = true;
+  const ARROW = { both: '<->', to: '->', none: '--' };
+  let dirty = true, freshSpawn = false, touched = false;
+  const cam = { x: 0, y: 0, s: 1 }; let camGoal = null;
+  let depthShown = 0;
+
+  let plainOK = false;
+  try { const t = document.createElement('span'); t.contentEditable = 'plaintext-only'; plainOK = t.contentEditable === 'plaintext-only'; } catch (e) {}
+
+  /* ---------- model helpers ---------- */
+  const uid = () => Math.random().toString(36).slice(2, 10);
+  const N = id => doc.nodes[id];
+  const plain = s => (s || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  function makeDoc(text) { const id = uid(); return { root: id, nodes: { [id]: { id, text, parent: null, kids: [], x: 0, y: 0 } } }; }
+  function addRaw(d, pid, text, extra) { const id = uid(); d.nodes[id] = Object.assign({ id, text, parent: pid, kids: [], x: 0, y: 0 }, extra || {}); d.nodes[pid].kids.push(id); return id; }
+
+  function sampleDoc() {
+    const d = makeDoc('Sea of my mind');
+    const groups = [
+      ['Things I\'m building', 0, 1, ['Pixel resume site', 'This mind map', 'A tiny synth']],
+      ['Open questions', 3, -1, ['What makes work feel like play?', 'Where do ideas go at night?']],
+      ['Learning', 2, 1, ['Sound design', 'Typography', 'Data viz']],
+      ['People', 4, -1, ['Mentors', 'Collaborators']],
+      ['Rest', 1, -1, ['Long walks', 'Ocean playlists']],
+    ];
+    const ids = {};
+    for (const [t, c, side, kids] of groups) {
+      const g = addRaw(d, d.root, t, { side, color: PALETTE[c][1] });
+      ids[t] = g; kids.forEach(k => addRaw(d, g, k));
+    }
+    const f = uid();
+    d.nodes[f] = { id: f, text: 'Rush', parent: null, kids: [], x: -430, y: 300, side: -1, color: PALETTE[0][1] };
+    ['Deadlines', 'Noise'].forEach(k => addRaw(d, f, k));
+    d.links = [{ id: uid(), a: ids['Rest'], b: f, label: 'opposite', dir: 'both' }];
+    return d;
+  }
+
+  function level(id) { let l = 0, n = N(id); while (n && n.parent) { l++; n = N(n.parent); } return l; }
+  function colorOf(id) { let n = N(id); while (n) { if (n.color) return n.color; n = n.parent ? N(n.parent) : null; } return PALETTE[0][1]; }
+  function subtree(id) { const out = []; const walk = k => { out.push(k); N(k).kids.forEach(walk); }; walk(id); return out; }
+  function countDesc(id) { return subtree(id).length - 1; }
+  function visibleSet() { const s = new Set(); const walk = k => { s.add(k); const n = N(k); if (!n.collapsed) n.kids.forEach(walk); }; walk(doc.root); freeRoots().forEach(walk); return s; }
+  function size(id) { const v = views[id]; return v && v.w ? v : { w: 120, h: 34 }; }
+  function topOf(id) { let n = N(id); while (n.parent) n = N(n.parent); return n.id; }
+  function freeRoots() { return Object.keys(doc.nodes).filter(id => !doc.nodes[id].parent && id !== doc.root); }
+  function slv(id) { return level(id) + (topOf(id) === doc.root ? 0 : 1); }
+  const linkById = id => (doc.links || []).find(l => l.id === id);
+
+  function nextColor() {
+    const tops = N(doc.root).kids.concat(freeRoots());
+    const counts = PALETTE.slice(0, 5).map(([, c]) => tops.filter(k => N(k).color === c).length);
+    const min = Math.min(...counts); return PALETTE[counts.indexOf(min)][1];
+  }
+  function balanceSide() {
+    let r = 0, l = 0; N(doc.root).kids.forEach(k => { const w = subtree(k).length; if (N(k).side === -1) l += w; else r += w; });
+    return r <= l ? 1 : -1;
+  }
+
+  /* ---------- storage ---------- */
+  let storageOK = true, saveT = null;
+  function loadStore() {
+    try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.maps && typeof s.maps === 'object') store = Object.assign(store, s); } }
+    catch (e) { storageOK = false; }
+  }
+  function persistNow() {
+    clearTimeout(saveT);
+    if (!doc || !store.maps[store.current]) return;
+    const m = store.maps[store.current];
+    m.data = doc; m.name = plain(N(doc.root).text) || 'Untitled map'; m.updated = Date.now();
+    store.auto = auto;
+    try { localStorage.setItem(KEY, JSON.stringify(store)); storageOK = true; } catch (e) { storageOK = false; }
+    setSave(storageOK ? 'Saved' : 'Not saved: browser storage is off. Copy from the Logbook to keep it.', !storageOK);
+    $('#mapName').textContent = m.name;
+  }
+  function scheduleSave() { clearTimeout(saveT); setSave('Saving…'); saveT = setTimeout(persistNow, 350); }
+  function setSave(t, warn) { const el = $('#saveTxt'); el.textContent = warn ? 'Not saved' : t; el.title = t; el.classList.toggle('warn', !!warn); }
+
+  /* ---------- history ---------- */
+  function snap() { undo.push(JSON.stringify(doc)); if (undo.length > 150) undo.shift(); redo = []; }
+  function doUndo() {
+    if (editing) commitEdit();
+    if (!undo.length) return toast('Nothing to undo');
+    redo.push(JSON.stringify(doc)); doc = JSON.parse(undo.pop()); afterHistory(); toast('Undone');
+  }
+  function doRedo() {
+    if (editing) commitEdit();
+    if (!redo.length) return toast('Nothing to redo');
+    undo.push(JSON.stringify(doc)); doc = JSON.parse(redo.pop()); afterHistory(); toast('Redone');
+  }
+  function afterHistory() { if (sel && !doc.nodes[sel]) sel = null; if (diving && !doc.nodes[diving]) diving = sel || doc.root; sync(); }
+
+  /* ---------- rendering ---------- */
+  function computeFocus() {
+    focusSet = new Set();
+    if (!diving || !doc.nodes[diving]) return;
+    subtree(diving).forEach(k => focusSet.add(k));
+    let n = N(diving); while (n) { focusSet.add(n.id); n = n.parent ? N(n.parent) : null; }
+  }
+
+  function makeView(id) {
+    const n = N(id);
+    const el = document.createElement('div'); el.className = 'node'; el.dataset.id = id;
+    const txt = document.createElement('span'); txt.className = 'txt';
+    const fold = document.createElement('span'); fold.className = 'fold'; fold.hidden = true; fold.title = 'Unfold';
+    el.append(txt, fold); world.appendChild(el);
+    const p = !freshSpawn && n.parent && views[n.parent];
+    const v = { el, txt, fold, x: p ? p.x : n.x, y: p ? p.y : n.y, w: 0, h: 0, px: NaN, py: NaN };
+    txt.addEventListener('keydown', e => {
+      if (editing !== id) return;
+      e.stopPropagation();
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); commitEdit(); }
+      else if (e.key === 'Escape') { e.preventDefault(); commitEdit(true); }
+      else if (e.key === 'Tab') { e.preventDefault(); commitEdit(); if (doc.nodes[id]) addChild(id); }
+    });
+    txt.addEventListener('input', () => { if (editing !== id) return; v.w = el.offsetWidth; v.h = el.offsetHeight; if (auto) tidy(); dirty = true; });
+    txt.addEventListener('blur', () => { if (editing === id) commitEdit(); });
+    txt.addEventListener('paste', e => {
+      if (plainOK) return;
+      e.preventDefault(); const t = (e.clipboardData || window.clipboardData).getData('text');
+      document.execCommand('insertText', false, t);
+    });
+    return v;
+  }
+
+  function repairDoc(d) {
+    if (!d || !d.nodes || !d.nodes[d.root]) return;
+    for (const id in d.nodes) {
+      const n = d.nodes[id];
+      n.id = id;
+      if (!Array.isArray(n.kids)) n.kids = [];
+      if (id === d.root || (n.parent && !d.nodes[n.parent])) n.parent = null;
+      if (!Number.isFinite(n.x)) n.x = 0;
+      if (!Number.isFinite(n.y)) n.y = 0;
+      if (typeof n.text !== 'string') n.text = String(n.text == null ? '' : n.text);
+    }
+    for (const id in d.nodes) { const n = d.nodes[id]; n.kids = n.kids.filter((k, i, a) => d.nodes[k] && d.nodes[k].parent === id && a.indexOf(k) === i); }
+    for (const id in d.nodes) { const n = d.nodes[id]; if (n.parent && !d.nodes[n.parent].kids.includes(id)) d.nodes[n.parent].kids.push(id); }
+    for (const id in d.nodes) {
+      const seen = new Set(); let k = id;
+      while (k && d.nodes[k].parent) {
+        if (seen.has(k)) { const n = d.nodes[k], p = d.nodes[n.parent]; p.kids = p.kids.filter(x => x !== k); n.parent = null; break; }
+        seen.add(k); k = d.nodes[k].parent;
+      }
+    }
+    if (!Array.isArray(d.links)) d.links = [];
+  }
+
+  function sync(opts = {}) {
+    repairDoc(doc);
+    doc.links = doc.links.filter(l => doc.nodes[l.a] && doc.nodes[l.b]);
+    normSel();
+    const vis = visibleSet();
+    computeFocus();
+    for (const id in views) if (!doc.nodes[id]) { views[id].el.remove(); delete views[id]; }
+    for (const id in paths) if (!doc.nodes[id] || !doc.nodes[id].parent) { paths[id].remove(); delete paths[id]; }
+    for (const id in doc.nodes) {
+      const n = N(id); const v = views[id] || (views[id] = makeView(id));
+      const lv = slv(id), c = colorOf(id), shown = vis.has(id);
+      const dim = !!diving && !focusSet.has(id);
+      v.el.hidden = !shown;
+      v.el.style.setProperty('--c', c);
+      v.el.classList.toggle('root', id === doc.root);
+      v.el.classList.toggle('l1', lv === 1);
+      v.el.classList.toggle('free', !n.parent && id !== doc.root);
+      v.el.classList.toggle('sel', msel.has(id));
+      v.el.classList.toggle('dim', dim);
+      v.el.classList.toggle('left', !!n.parent && n.x < N(n.parent).x);
+      if (editing !== id && v.txt.textContent !== n.text) v.txt.textContent = n.text;
+      const hidden = n.collapsed ? countDesc(id) : 0;
+      v.fold.hidden = !hidden; v.fold.textContent = '+' + hidden;
+      if (n.parent) {
+        let p = paths[id];
+        if (!p) { p = document.createElementNS(SVGNS, 'path'); edgesG.appendChild(p); paths[id] = p; }
+        p.style.display = shown ? '' : 'none';
+        p.setAttribute('stroke', c);
+        p.setAttribute('stroke-width', lv === 1 ? 3 : 2);
+        p.classList.toggle('dim', dim);
+      }
+    }
+    for (const id of vis) { const v = views[id]; v.w = v.el.offsetWidth; v.h = v.el.offsetHeight; }
+    syncLinks(vis);
+    if (auto || opts.tidy) tidy();
+    freshSpawn = false; dirty = true;
+    updateDock(); updateCount();
+    if (!opts.nosave) scheduleSave();
+  }
+
+  function refreshSel() {
+    normSel();
+    for (const id in views) views[id].el.classList.toggle('sel', msel.has(id));
+    if (doc) syncLinks(visibleSet());
+    updateDock();
+  }
+
+  function drawEdges() {
+    for (const id in paths) {
+      const p = paths[id]; if (p.style.display === 'none') continue;
+      const n = N(id); if (!n) continue;
+      const a = views[n.parent], b = views[id]; if (!a || !b) continue;
+      const right = b.x >= a.x;
+      const x1 = a.x + (right ? 1 : -1) * (a.w / 2 - (n.parent === doc.root ? 6 : 0));
+      const x2 = b.x + (right ? -1 : 1) * b.w / 2;
+      const m = (x1 + x2) / 2;
+      p.setAttribute('d', `M${x1.toFixed(1)} ${a.y.toFixed(1)}C${m.toFixed(1)} ${a.y.toFixed(1)} ${m.toFixed(1)} ${b.y.toFixed(1)} ${x2.toFixed(1)} ${b.y.toFixed(1)}`);
+    }
+  }
+
+  /* ---------- layout ---------- */
+  // Layout engine. Modes:
+  //  cleanup: keep each idea near where it is, snap to the grid, push apart anything that overlaps
+  //  arrange: fresh layout, branches fan out in a gentle curve
+  const GRID = 16, snapTo = (v, g) => Math.round(v / g) * g;
+  let layoutRel = {}, layoutMode = 'arrange';
+  const topSide = (t, k) => { const sd = N(k).side; return sd === 1 || sd === -1 ? sd : (t === doc.root ? 1 : (N(t).side === -1 ? -1 : 1)); };
+  function layoutKids(pid, list, side) {
+    const p = N(pid), pw = size(pid).w, gap = pid === doc.root ? VG_ROOT : VG, base = pid === doc.root ? HG_ROOT : HG;
+    const clean = layoutMode === 'cleanup';
+    if (clean) list = list.slice().sort((x, y) => N(x).y - N(y).y);
+    const items = list.map(k => { const ext = layoutNode(k, side); return { k, ext, h: ext.bottom - ext.top }; });
+    if (!items.length) return null;
+    const total = items.reduce((acc, it) => acc + it.h, 0) + gap * (items.length - 1);
+    let y = -total / 2;
+    for (const it of items) { const def = y - it.ext.top; y += it.h + gap; it.want = clean ? snapTo(N(it.k).y - p.y, 8) : def; }
+    let prev = -Infinity;
+    for (const it of items) {
+      let cy = it.want;
+      if (cy + it.ext.top < prev + gap) cy = prev + gap - it.ext.top;
+      it.y = cy; prev = cy + it.ext.bottom;
+    }
+    let top = Infinity, bottom = -Infinity;
+    for (const it of items) {
+      const c = N(it.k), cw = size(it.k).w;
+      const gx = clean
+        ? Math.max(GRID, snapTo(Math.abs(c.x - p.x) - pw / 2 - cw / 2, GRID))
+        : base + snapTo(Math.min(112, Math.abs(it.y) * 0.16), GRID);
+      layoutRel[it.k] = { x: side * (pw / 2 + gx + cw / 2), y: it.y };
+      top = Math.min(top, it.y + it.ext.top); bottom = Math.max(bottom, it.y + it.ext.bottom);
+    }
+    return { top, bottom };
+  }
+  function layoutNode(id, side) {
+    const n = N(id), z = size(id); let top = -z.h / 2, bottom = z.h / 2;
+    if (!n.collapsed && n.kids.length) {
+      const groups = n.parent ? [[n.kids, side]] : [[n.kids.filter(k => topSide(id, k) === 1), 1], [n.kids.filter(k => topSide(id, k) === -1), -1]];
+      for (const [list, sd] of groups) { const e = layoutKids(id, list, sd); if (e) { top = Math.min(top, e.top); bottom = Math.max(bottom, e.bottom); } }
+    }
+    return { top, bottom };
+  }
+  function applyRel(id) {
+    const n = N(id); if (n.collapsed) return;
+    for (const k of n.kids) { const r = layoutRel[k]; if (!r) continue; N(k).x = n.x + r.x; N(k).y = n.y + r.y; applyRel(k); }
+  }
+  function runLayout(mode, hosts) {
+    layoutMode = mode; layoutRel = {};
+    hosts.forEach(h => { if (!doc.nodes[h]) return; const n = N(h); const side = n.parent ? (Math.sign(n.x - N(n.parent).x) || 1) : 1; layoutNode(h, side); applyRel(h); });
+    dirty = true;
+  }
+  function tidy(mode = 'arrange') { runLayout(mode, [doc.root, ...freeRoots()]); }
+  const areaHost = id => N(id).parent || id;
+  function tidyArea(id, mode = 'cleanup') { runLayout(mode, [areaHost(id)]); }
+
+  function placeNew(id) {
+    const n = N(id), p = N(n.parent), pv = size(n.parent);
+    const top = topOf(n.parent);
+    const side = n.parent === doc.root ? n.side : n.parent === top ? ((n.side === 1 || n.side === -1) ? n.side : (p.side === -1 ? -1 : 1)) : (Math.sign(p.x - N(top).x) || 1);
+    const sibs = p.kids.filter(k => k !== id && Math.sign(N(k).x - p.x) === side);
+    n.x = p.x + side * (pv.w / 2 + (n.parent === doc.root ? HG_ROOT : HG) + 60);
+    if (sibs.length && !p.collapsed) {
+      const last = sibs.reduce((a, k) => (N(k).y > N(a).y ? k : a));
+      n.y = N(last).y + size(last).h / 2 + 34;
+    } else n.y = p.y;
+  }
+
+  /* ---------- actions ---------- */
+  function select(id) {
+    if (id && !doc.nodes[id]) id = null;
+    sel = id; selLink = null; msel = new Set(id ? [id] : []); refreshSel();
+    if (diving && id && id !== diving) { diving = id; centerOn(id, Math.max(cam.s, 1.15)); sync({ nosave: true }); $('#diveName').textContent = plain(N(id).text) || 'untitled'; }
+  }
+
+  function addChild(pid) {
+    if (editing) commitEdit();
+    if (!doc.nodes[pid]) pid = doc.root;
+    snap();
+    const p = N(pid); p.collapsed = false;
+    const id = uid(); const n = { id, text: '', parent: pid, kids: [], x: p.x, y: p.y };
+    if (pid === doc.root) { n.side = balanceSide(); n.color = nextColor(); }
+    doc.nodes[id] = n; p.kids.push(id);
+    placeNew(id);
+    sel = id; sync(); startEdit(id, true); ensureVisible(id); puff(id);
+  }
+
+  function addSibling(id) {
+    if (!id || id === doc.root) return addChild(doc.root);
+    if (!N(id).parent) return addFree(N(id).x, N(id).y + size(id).h / 2 + 60);
+    if (editing) commitEdit();
+    snap();
+    const ref = N(id), p = N(ref.parent);
+    const nid = uid(); const n = { id: nid, text: '', parent: p.id, kids: [], x: ref.x, y: ref.y + size(id).h / 2 + 30 };
+    if (p.id === doc.root) { n.side = ref.side; n.color = nextColor(); }
+    doc.nodes[nid] = n; p.kids.splice(p.kids.indexOf(id) + 1, 0, nid);
+    sel = nid; sync(); startEdit(nid, true); ensureVisible(nid); puff(nid);
+  }
+
+  function addParent(id) {
+    const ids = (msel.size > 1 ? [...msel] : [id]).filter(k => k && doc.nodes[k]);
+    if (!ids.length) return toast('Select an idea first');
+    if (ids.includes(doc.root)) return toast('The center has nothing above it. Pick other ideas.');
+    if (ids.some(k => !N(k).parent)) return toast(ids.length > 1 ? 'Free ideas sit at the top of their own maps. Pick their branches instead.' : 'This idea already sits at the top of its own little map.');
+    const pid = N(ids[0]).parent;
+    if (ids.some(k => N(k).parent !== pid)) return toast('To group ideas under one parent, pick ones on the same level under the same idea.');
+    if (editing) commitEdit();
+    snap();
+    const p = N(pid), nid = uid();
+    ids.sort((a, b) => p.kids.indexOf(a) - p.kids.indexOf(b));
+    const first = N(ids[0]);
+    const m = { id: nid, text: '', parent: pid, kids: ids.slice(), x: first.x, y: ids.reduce((a, k) => a + N(k).y, 0) / ids.length };
+    if (!p.parent) m.side = first.side;
+    if (pid === doc.root) m.color = first.color;
+    const at = p.kids.indexOf(ids[0]);
+    p.kids = p.kids.filter(k => !ids.includes(k)); p.kids.splice(at, 0, nid);
+    ids.forEach(k => { const n = N(k); n.parent = nid; if (!p.parent) delete n.side; if (pid === doc.root && n.color === m.color) delete n.color; });
+    if (!auto) { const side = Math.sign(first.x - p.x) || 1; ids.forEach(k => subtree(k).forEach(d => { N(d).x += side * 170; })); }
+    doc.nodes[nid] = m;
+    sel = nid; msel = new Set([nid]); sync(); startEdit(nid, true, ids[0]); ensureVisible(nid); puff(nid);
+    if (ids.length > 1) toast(`Grouped ${ids.length} ideas. Name their new parent.`);
+  }
+
+  function normSel() {
+    for (const k of [...msel]) if (!doc.nodes[k]) msel.delete(k);
+    if (sel && !doc.nodes[sel]) sel = null;
+    if (!sel) msel.clear(); else if (!msel.has(sel)) msel = new Set([sel]);
+  }
+  // After a hand drag: remember which side of its center each moved branch is on, and the top-to-bottom order.
+  function keepManualLayout(ids) {
+    const parents = new Set();
+    ids.forEach(id => {
+      const n = doc.nodes[id]; if (!n || !n.parent) return;
+      const p = N(n.parent);
+      if (!p.parent) n.side = n.x >= p.x ? 1 : -1;
+      parents.add(p.id);
+    });
+    parents.forEach(pid => { const p = N(pid); p.kids.sort((a, b) => N(a).y - N(b).y); });
+  }
+  function setBoxMode(on) {
+    boxMode = on;
+    $('#bBox').classList.toggle('on', on); $('#bBox').setAttribute('aria-pressed', String(on));
+    document.body.classList.toggle('boxmode', on);
+    if (on) toast('Drag across the sea to select ideas. Tip: hold Shift and drag any time.');
+  }
+  function toggleMulti(id) {
+    if (editing) commitEdit();
+    selLink = null;
+    if (msel.has(id) && msel.size > 1) { msel.delete(id); sel = [...msel].pop(); }
+    else if (!msel.has(id)) { if (!sel) msel.clear(); msel.add(id); sel = id; }
+    refreshSel();
+  }
+
+  function removeNode(id) {
+    if (!id) return;
+    if (msel.size > 1) {
+      const ids = [...msel].filter(k => k !== doc.root && doc.nodes[k]);
+      if (!ids.length) return toast('The center stays. Rename it instead.');
+      snap(); let next = null;
+      ids.forEach(k => {
+        if (!doc.nodes[k]) return;
+        const n = N(k);
+        if (n.parent && doc.nodes[n.parent]) { const p = N(n.parent); p.kids.splice(p.kids.indexOf(k), 1); next = p.id; }
+        subtree(k).forEach(d => delete doc.nodes[d]);
+      });
+      sel = next && doc.nodes[next] ? next : null; msel = new Set();
+      if (diving && !doc.nodes[diving]) diving = sel || doc.root;
+      sync(); return toast(`Deleted ${ids.length} ideas. Undo brings them back.`);
+    }
+    if (id === doc.root) return toast('The center stays. Rename it instead.');
+    snap();
+    const n = N(id), gone = subtree(id); let next = null;
+    if (n.parent) { const p = N(n.parent), i = p.kids.indexOf(id); next = p.kids[i - 1] || p.kids[i + 1] || p.id; p.kids.splice(i, 1); }
+    gone.forEach(k => delete doc.nodes[k]);
+    if (diving && !doc.nodes[diving]) diving = next || doc.root;
+    sel = next; sync();
+    toast(gone.length > 1 ? `Deleted ${gone.length} ideas. Undo brings them back.` : 'Deleted');
+  }
+
+  function toggleFold(id) {
+    if (!id || !N(id).kids.length) return toast('Nothing to fold here yet');
+    snap(); const opening = !!N(id).collapsed; N(id).collapsed = !opening; sync();
+    if (opening) {
+      const v = views[id];
+      subtree(id).forEach(k => { if (k !== id && views[k] && v) { views[k].x = v.x; views[k].y = v.y; } });
+    }
+    tidyArea(id, 'cleanup'); scheduleSave();
+  }
+
+  function unfoldAll() {
+    if (editing) commitEdit();
+    const closed = Object.keys(doc.nodes).filter(k => N(k).collapsed && N(k).kids.length);
+    if (!closed.length) return toast('Everything is already unfolded');
+    // the outermost folded ideas: no folded idea above them
+    const top = closed.filter(k => { let n = N(k); while (n.parent) { n = N(n.parent); if (n.collapsed) return false; } return true; });
+    snap();
+    closed.forEach(k => { N(k).collapsed = false; });
+    sync();
+    top.forEach(k => { const v = views[k]; if (v) subtree(k).forEach(d => { if (d !== k && views[d]) { views[d].x = v.x; views[d].y = v.y; } }); });
+    tidy('cleanup'); scheduleSave();
+    toast(`Unfolded ${closed.length} ${closed.length === 1 ? 'idea' : 'ideas'}`);
+    setTimeout(() => fit(), 60);
+  }
+  function foldAll() {
+    if (editing) commitEdit();
+    // fold every branch right under the center and under each free idea, so the top level shows
+    const tops = [doc.root, ...freeRoots()];
+    const targets = tops.flatMap(t => N(t).kids).filter(k => N(k).kids.length && !N(k).collapsed);
+    if (!targets.length) return toast('Nothing left to fold');
+    snap();
+    targets.forEach(k => { N(k).collapsed = true; });
+    if (sel && !visibleSet().has(sel)) { let n = N(sel); while (n.parent && !visibleSet().has(n.id)) n = N(n.parent); sel = n.id; }
+    sync(); tidy(); scheduleSave();
+    toast(`Folded ${targets.length} ${targets.length === 1 ? 'branch' : 'branches'}. U unfolds them all.`);
+    setTimeout(() => fit(), 60);
+  }
+
+  function setColor(id, c) {
+    if (!id) return;
+    snap(); (msel.size > 1 ? [...msel] : [id]).forEach(k => { if (doc.nodes[k]) N(k).color = c; }); sync();
+  }
+
+  function reparent(id, target) {
+    const n = N(id), t = N(target);
+    if (n.parent === target) return false;
+    if (n.parent) { const old = N(n.parent); old.kids.splice(old.kids.indexOf(id), 1); }
+    t.kids.push(id); n.parent = target; t.collapsed = false;
+    if (!t.parent) { n.side = n.x >= t.x ? 1 : -1; if (target === doc.root && !n.color) n.color = nextColor(); }
+    else delete n.side;
+    toast(`Attached to “${plain(t.text) || 'untitled'}”`);
+    return true;
+  }
+
+  /* ---------- free ideas & links ---------- */
+  function addFree(x, y) {
+    if (editing) commitEdit();
+    if (labelEditing) commitLabel();
+    endLinking();
+    snap();
+    const id = uid();
+    doc.nodes[id] = { id, text: '', parent: null, kids: [], x, y, side: 1, color: nextColor() };
+    sel = id; selLink = null; sync(); startEdit(id, true, null); ensureVisible(id); puff(id);
+  }
+  function addFreeCenter() {
+    const top = chromeTop(), ah = innerHeight - top - chromeBottom();
+    const w = toWorld(innerWidth / 2, top + ah / 2);
+    let y = w.y, tries = 0;
+    while (hitNode({ x: w.x, y }, new Set()) && tries++ < 12) y += 50;
+    addFree(w.x, y);
+  }
+
+  function makeLinkView(lid) {
+    const path = document.createElementNS(SVGNS, 'path'); $('#links').appendChild(path);
+    const label = document.createElement('div'); label.className = 'llabel'; label.dataset.id = lid;
+    const txt = document.createElement('span'); txt.className = 'ltxt'; label.appendChild(txt); world.appendChild(label);
+    txt.addEventListener('keydown', e => {
+      if (labelEditing !== lid) return;
+      e.stopPropagation();
+      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); commitLabel(); }
+      else if (e.key === 'Escape') { e.preventDefault(); commitLabel(true); }
+    });
+    txt.addEventListener('input', () => { if (labelEditing !== lid) return; const lv = linkViews[lid]; lv.w = label.offsetWidth; lv.h = label.offsetHeight; linksDirty = true; });
+    txt.addEventListener('blur', () => { if (labelEditing === lid) commitLabel(); });
+    return { path, label, txt, w: 0, h: 0, hidden: false, geo: null, mx: null, my: null };
+  }
+
+  function syncLinks(vis) {
+    const live = new Set(doc.links.map(l => l.id));
+    for (const lid in linkViews) if (!live.has(lid)) { linkViews[lid].path.remove(); linkViews[lid].label.remove(); delete linkViews[lid]; }
+    if (selLink && !live.has(selLink)) selLink = null;
+    for (const l of doc.links) {
+      const lv = linkViews[l.id] || (linkViews[l.id] = makeLinkView(l.id));
+      const shown = vis.has(l.a) && vis.has(l.b);
+      const dim = !!diving && !(focusSet.has(l.a) && focusSet.has(l.b));
+      const on = l.id === selLink;
+      lv.hidden = !shown; lv.path.style.display = shown ? '' : 'none'; lv.label.hidden = !shown;
+      lv.path.classList.toggle('sel', on); lv.label.classList.toggle('sel', on);
+      lv.path.classList.toggle('dim', dim); lv.label.classList.toggle('dim', dim);
+      lv.path.classList.toggle('to', l.dir === 'to');
+      const m = on ? 'url(#arrS)' : 'url(#arrN)';
+      if (l.dir === 'none') { lv.path.removeAttribute('marker-start'); lv.path.removeAttribute('marker-end'); }
+      else { lv.path.setAttribute('marker-end', m); if (l.dir === 'both') lv.path.setAttribute('marker-start', m); else lv.path.removeAttribute('marker-start'); }
+      if (labelEditing !== l.id) {
+        const t = l.label || ARROW[l.dir];
+        if (lv.txt.textContent !== t) lv.txt.textContent = t;
+        lv.label.classList.toggle('glyph', !l.label);
+      }
+      if (shown) { lv.w = lv.label.offsetWidth; lv.h = lv.label.offsetHeight; }
+    }
+    linksDirty = true;
+    $('#linkBar').hidden = !selLink || !!labelEditing;
+    const sl = selLink && linkById(selLink);
+    if (sl) document.querySelectorAll('#linkBar [data-dir]').forEach(b => b.classList.toggle('on', b.dataset.dir === sl.dir));
+  }
+
+  function edgePt(v, tx, ty) {
+    const dx = tx - v.x, dy = ty - v.y;
+    const m = Math.max(Math.abs(dx) / (v.w / 2 + 7), Math.abs(dy) / (v.h / 2 + 7));
+    return m ? { x: v.x + dx / m, y: v.y + dy / m } : { x: v.x, y: v.y };
+  }
+  function drawLinks() {
+    for (const l of doc.links) {
+      const lv = linkViews[l.id]; if (!lv || lv.hidden) continue;
+      const a = views[l.a], b = views[l.b]; if (!a || !b) continue;
+      const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy) || 1, bend = Math.min(140, dist * .2);
+      const c = { x: (a.x + b.x) / 2 - dy / dist * bend, y: (a.y + b.y) / 2 + dx / dist * bend };
+      const p0 = edgePt(a, c.x, c.y), p2 = edgePt(b, c.x, c.y);
+      lv.geo = [p0, c, p2];
+      lv.path.setAttribute('d', `M${p0.x.toFixed(1)} ${p0.y.toFixed(1)}Q${c.x.toFixed(1)} ${c.y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`);
+      lv.mx = .25 * p0.x + .5 * c.x + .25 * p2.x; lv.my = .25 * p0.y + .5 * c.y + .25 * p2.y;
+      lv.label.style.transform = `translate(${(lv.mx - lv.w / 2).toFixed(1)}px,${(lv.my - lv.h / 2).toFixed(1)}px)`;
+    }
+  }
+  function hitLink(w) {
+    let best = null, bd = 10 / cam.s;
+    for (const l of doc.links) {
+      const lv = linkViews[l.id]; if (!lv || lv.hidden || !lv.geo) continue;
+      const [p, c, q] = lv.geo;
+      for (let i = 0; i <= 32; i++) {
+        const t = i / 32, u = 1 - t;
+        const d = Math.hypot(w.x - (u * u * p.x + 2 * u * t * c.x + t * t * q.x), w.y - (u * u * p.y + 2 * u * t * c.y + t * t * q.y));
+        if (d < bd) { bd = d; best = l.id; }
+      }
+    }
+    return best;
+  }
+  function placeLinkBar() {
+    const bar = $('#linkBar'), lv = linkViews[selLink];
+    if (!lv || lv.hidden || lv.mx == null) { bar.style.visibility = 'hidden'; return; }
+    bar.style.visibility = '';
+    const sx = lv.mx * cam.s + cam.x, sy = lv.my * cam.s + cam.y + (lv.h / 2) * cam.s + 12;
+    const bw = bar.offsetWidth, bh = bar.offsetHeight;
+    bar.style.left = clamp(sx - bw / 2, 8, innerWidth - bw - 8) + 'px';
+    bar.style.top = clamp(sy, 64, innerHeight - bh - 60) + 'px';
+  }
+
+  function selectLink(lid) { if (editing) commitEdit(); sel = null; selLink = lid; refreshSel(); }
+  function startLinking(id) {
+    if (!id || !doc.nodes[id]) return toast('Select an idea first, then press Link');
+    if (editing) commitEdit();
+    endLinking();
+    linkFrom = id; document.body.classList.add('linking'); $('#bLink').classList.add('on');
+    if (views[id]) views[id].el.classList.add('linksrc');
+    toast('Now tap the idea to connect it with. Esc cancels.');
+  }
+  function endLinking() {
+    if (linkFrom && views[linkFrom]) views[linkFrom].el.classList.remove('linksrc');
+    linkFrom = null; document.body.classList.remove('linking'); $('#bLink').classList.remove('on');
+  }
+  function createLink(a, b) {
+    const ex = doc.links.find(l => (l.a === a && l.b === b) || (l.a === b && l.b === a));
+    if (ex) { selectLink(ex.id); return toast('These two are already linked'); }
+    snap();
+    const id = uid(); doc.links.push({ id, a, b, label: '', dir: 'both' });
+    sel = null; selLink = id; sync(); setTimeout(() => editLabel(id, true), 30);
+  }
+  function editLabel(lid, isNew = false) {
+    const l = lid && linkById(lid), lv = lid && linkViews[lid];
+    if (!l || !lv || lv.hidden) return;
+    if (editing) commitEdit();
+    if (labelEditing && labelEditing !== lid) commitLabel();
+    labelEditing = lid; labelIsNew = isNew; labelOld = l.label || ''; selLink = lid; sel = null;
+    $('#linkBar').hidden = true;
+    lv.label.classList.add('editing'); lv.label.classList.remove('glyph');
+    lv.txt.textContent = l.label || '';
+    lv.txt.contentEditable = plainOK ? 'plaintext-only' : 'true';
+    lv.txt.focus({ preventScroll: true });
+    const r = document.createRange(); r.selectNodeContents(lv.txt);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    lv.w = lv.label.offsetWidth; lv.h = lv.label.offsetHeight; linksDirty = true;
+    if (isNew) toast('Name how they relate, e.g. opposite. Enter to finish, or leave it blank.');
+  }
+  function commitLabel(cancel = false) {
+    const lid = labelEditing; if (!lid) return;
+    const lv = linkViews[lid], l = linkById(lid);
+    labelEditing = null;
+    if (lv) {
+      lv.txt.contentEditable = 'false'; lv.label.classList.remove('editing');
+      const text = (lv.txt.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+      if (l && !cancel && text !== labelOld) { if (!labelIsNew) snap(); l.label = text; }
+      lv.txt.blur();
+    }
+    labelIsNew = false; sync();
+  }
+  function removeLink(lid) {
+    if (!lid) return;
+    snap(); doc.links = doc.links.filter(l => l.id !== lid); selLink = null; sync(); toast('Link removed');
+  }
+  function setLinkDir(dir) { const l = linkById(selLink); if (!l || l.dir === dir) return; snap(); l.dir = dir; sync(); }
+  function flipLink() { const l = linkById(selLink); if (!l) return; snap(); [l.a, l.b] = [l.b, l.a]; sync(); }
+  function fullOutline() {
+    let s = outline(doc.root);
+    freeRoots().forEach(f => { s += '\n' + outline(f); });
+    if (doc.links.length) s += '\nLinks\n' + doc.links.map(l => `- ${plain(N(l.a).text)} ${ARROW[l.dir]} ${plain(N(l.b).text)}${l.label ? ' (' + l.label + ')' : ''}`).join('\n') + '\n';
+    return s;
+  }
+
+  /* ---------- editing ---------- */
+  function startEdit(id, isNew = false, back = null) {
+    if (editing && editing !== id) commitEdit();
+    const v = views[id]; if (!v || v.el.hidden) return;
+    editing = id; editIsNew = isNew; editOld = N(id).text; editReturn = back; sel = id; selLink = null; refreshSel();
+    v.el.classList.add('editing');
+    v.txt.contentEditable = plainOK ? 'plaintext-only' : 'true';
+    v.txt.focus({ preventScroll: true });
+    const r = document.createRange(); r.selectNodeContents(v.txt);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+
+  function commitEdit(cancel = false) {
+    const id = editing; if (!id) return;
+    const v = views[id], n = N(id);
+    editing = null; v.txt.contentEditable = 'false'; v.el.classList.remove('editing');
+    const text = (v.txt.innerText || '').replace(/ /g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+    if (cancel || !text) {
+      if (editIsNew) {
+        const back = editReturn || n.parent;
+        doc = JSON.parse(undo.pop());
+        sel = doc.nodes[back] ? back : null;
+      } else v.txt.textContent = editOld;
+    } else if (text !== editOld) {
+      if (!editIsNew) snap();
+      n.text = text; v.txt.textContent = text;
+    } else v.txt.textContent = text;
+    editIsNew = false;
+    v.txt.blur();
+    sync();
+    if (diving === id) $('#diveName').textContent = plain(n.text) || 'untitled';
+  }
+
+  /* ---------- camera ---------- */
+  function applyCam() {
+    world.style.transform = `translate(${cam.x}px,${cam.y}px) scale(${cam.s})`;
+    const g = 32 * cam.s * (cam.s < .5 ? 2 : 1);
+    gridEl.style.backgroundSize = `${g}px ${g}px`;
+    gridEl.style.backgroundPosition = `${cam.x}px ${cam.y}px`;
+  }
+  function zoomAt(x, y, f) {
+    camGoal = null; touched = true;
+    const ns = clamp(cam.s * f, .2, 2.6), wx = (x - cam.x) / cam.s, wy = (y - cam.y) / cam.s;
+    cam.s = ns; cam.x = x - wx * ns; cam.y = y - wy * ns;
+  }
+  const chromeTop = () => document.body.classList.contains('diving') ? 60 : $('.topbar').offsetHeight;
+  const chromeBottom = () => $('.transport').offsetHeight + (document.body.classList.contains('diving') ? 0 : $('.dock').offsetHeight + 14);
+
+  function fit(instant) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const id of visibleSet()) { const n = N(id), z = size(id); x0 = Math.min(x0, n.x - z.w / 2); x1 = Math.max(x1, n.x + z.w / 2); y0 = Math.min(y0, n.y - z.h / 2); y1 = Math.max(y1, n.y + z.h / 2); }
+    const top = chromeTop() + 20, aw = innerWidth - (innerWidth > 640 ? 120 : 40), ah = Math.max(160, innerHeight - top - chromeBottom() - 20);
+    const s = clamp(Math.min(aw / (x1 - x0 || 1), ah / (y1 - y0 || 1)), .3, 1.25);
+    const goal = { s, x: innerWidth / 2 - (x0 + x1) / 2 * s, y: top + ah / 2 - (y0 + y1) / 2 * s };
+    if (instant || reduce) { Object.assign(cam, goal); camGoal = null; } else camGoal = goal;
+  }
+  function centerOn(id, s = cam.s) {
+    const n = N(id); const top = chromeTop(), ah = innerHeight - top - chromeBottom();
+    camGoal = { s, x: innerWidth / 2 - n.x * s, y: top + ah / 2 - n.y * s };
+  }
+  function ensureVisible(id) {
+    const n = N(id), z = size(id), m = 70;
+    const sx = n.x * cam.s + cam.x, sy = n.y * cam.s + cam.y;
+    const top = chromeTop() + m, bot = innerHeight - chromeBottom() - m;
+    let dx = 0, dy = 0;
+    if (sx - z.w * cam.s / 2 < m) dx = m - (sx - z.w * cam.s / 2);
+    else if (sx + z.w * cam.s / 2 > innerWidth - m) dx = innerWidth - m - (sx + z.w * cam.s / 2);
+    if (sy < top) dy = top - sy; else if (sy > bot) dy = bot - sy;
+    if (dx || dy) camGoal = { s: cam.s, x: cam.x + dx, y: cam.y + dy };
+  }
+
+  function toggleDive(on = !diving) {
+    if (editing) commitEdit();
+    if (on) {
+      const id = sel || doc.root; sel = id; diving = id; preDiveCam = Object.assign({}, cam);
+      document.body.classList.add('diving');
+      $('#diveName').textContent = plain(N(id).text) || 'untitled';
+      centerOn(id, Math.max(cam.s, 1.2));
+      for (let i = 0; i < 3; i++) setTimeout(() => puff(id, 6), i * 260);
+    } else {
+      diving = null; document.body.classList.remove('diving');
+      if (preDiveCam) camGoal = preDiveCam;
+    }
+    $('#bDive').classList.toggle('on', !!diving); $('#bDive').setAttribute('aria-pressed', String(!!diving));
+    sync({ nosave: true }); refreshSel();
+  }
+
+  /* ---------- the sea (canvas) ---------- */
+  let W = 0, Hh = 0, dpr = 1, parts = [], bubbles = [];
+  function resize() {
+    dpr = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; Hh = innerHeight;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(Hh * dpr);
+    canvas.style.width = W + 'px'; canvas.style.height = Hh + 'px';
+    const n = Math.min(260, Math.round(W * Hh / 8000)); parts = [];
+    for (let i = 0; i < n; i++) {
+      const glow = Math.random() < .12;
+      parts.push({ x: Math.random() * W, y: Math.random() * Hh, z: .2 + Math.random() * .8, v: 4 + Math.random() * 14, w: .3 + Math.random() * .7, ph: Math.random() * 6.28, glow,
+        c: glow ? (Math.random() < .6 ? '255,92,151' : '83,216,234') : '190,215,255', s: Math.random() < .8 ? 1 : 2 });
+    }
+    dirty = true;
+  }
+  const mix = (a, b, k) => `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * k)).join(',')})`;
+  const wrap = (v, m) => ((v % m) + m) % m;
+
+  function targetDepth() {
+    let d = Math.log2(cam.s / .2) * 85;
+    if (sel && doc.nodes[sel]) d += level(sel) * 26;
+    if (diving) d += 150;
+    return clamp(d, 0, MAXDEPTH);
+  }
+
+  function puff(id, count = 9) {
+    if (reduce || !views[id]) return;
+    const v = views[id], sx = v.x * cam.s + cam.x, sy = v.y * cam.s + cam.y;
+    for (let i = 0; i < count; i++) bubbles.push({ x: sx + (Math.random() - .5) * 40, y: sy + (Math.random() - .5) * 10, r: 1.5 + Math.random() * 4, vy: .5 + Math.random() * 1.3, ph: Math.random() * 6.28, life: 1 });
+  }
+
+  let lastDepthTxt = '';
+  function drawSea(now) {
+    const t = reduce ? 0 : now / 1000;
+    depthShown += (targetDepth() - depthShown) * (reduce ? 1 : .035);
+    const k = depthShown / MAXDEPTH;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const g = ctx.createLinearGradient(0, 0, 0, Hh);
+    g.addColorStop(0, mix([19, 50, 94], [6, 10, 26], k));
+    g.addColorStop(.55, mix([8, 23, 50], [3, 6, 16], k));
+    g.addColorStop(1, mix([4, 10, 26], [1, 2, 7], k));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, Hh);
+
+    const ray = Math.max(0, 1 - k * 2.4);
+    if (ray > 0) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 5; i++) {
+        const x0 = W * (.08 + i * .2) + Math.sin(t * .18 + i * 1.7) * 50 + cam.x * .03;
+        const rg = ctx.createLinearGradient(0, 0, 0, Hh * .85);
+        rg.addColorStop(0, `rgba(140,200,255,${.075 * ray})`); rg.addColorStop(1, 'rgba(140,200,255,0)');
+        ctx.fillStyle = rg; ctx.beginPath();
+        ctx.moveTo(x0 - 26, 0); ctx.lineTo(x0 + 34, 0); ctx.lineTo(x0 + 170 + i * 18, Hh * .85); ctx.lineTo(x0 + 60, Hh * .85);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    for (const p of parts) {
+      const par = p.z * .12;
+      const x = wrap(p.x + cam.x * par + Math.sin(t * p.w + p.ph) * 7, W);
+      const y = wrap(p.y + cam.y * par - t * p.v * (1 + k * 1.5), Hh);
+      if (p.glow) {
+        const pulse = .5 + .5 * Math.sin(t * 1.3 + p.ph);
+        const a = (.12 + .55 * k) * (.35 + .65 * pulse), r = 4 + 12 * p.z;
+        const gg = ctx.createRadialGradient(x, y, 0, x, y, r);
+        gg.addColorStop(0, `rgba(${p.c},${a})`); gg.addColorStop(1, `rgba(${p.c},0)`);
+        ctx.fillStyle = gg; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+        ctx.fillStyle = `rgba(${p.c},${Math.min(1, a * 1.8)})`; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 2, 2);
+      } else {
+        const sz = p.s * (p.z > .75 ? 2 : 1);
+        ctx.fillStyle = `rgba(${p.c},${(.1 + .4 * p.z) * (1 - k * .45)})`;
+        ctx.fillRect(Math.round(x), Math.round(y), sz, sz);
+      }
+    }
+
+    if (bubbles.length) {
+      ctx.lineWidth = 1.2;
+      bubbles = bubbles.filter(b => b.life > 0 && b.y > -12);
+      for (const b of bubbles) {
+        b.y -= b.vy; b.x += Math.sin(b.ph + b.y * .05) * .45; b.life -= .0055;
+        ctx.strokeStyle = `rgba(190,235,255,${.55 * b.life})`;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.283); ctx.stroke();
+        ctx.fillStyle = `rgba(230,250,255,${.6 * b.life})`; ctx.fillRect(b.x - b.r * .45, b.y - b.r * .55, 1.5, 1.5);
+      }
+    }
+
+    const vg = ctx.createRadialGradient(W / 2, Hh / 2, Math.min(W, Hh) * (.3 - (diving ? .12 : 0)), W / 2, Hh / 2, Math.max(W, Hh) * .75);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(0,1,4,${.35 + .4 * k + (diving ? .2 : 0)})`);
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, Hh);
+
+    const dt = Math.round(depthShown) + ' M';
+    if (dt !== lastDepthTxt) {
+      lastDepthTxt = dt;
+      $('#depthTxt').textContent = dt; $('#gaugeTxt').textContent = dt;
+      $('#trackFill').style.width = (k * 100).toFixed(1) + '%';
+      $('#gaugeMark').style.top = (k * 100).toFixed(1) + '%';
+    }
+  }
+
+  /* ---------- main loop ---------- */
+  let dragActive = false;
+  function frameBody(now) {
+    if (camGoal) {
+      const e = reduce ? 1 : .12;
+      cam.x += (camGoal.x - cam.x) * e; cam.y += (camGoal.y - cam.y) * e; cam.s += (camGoal.s - cam.s) * e;
+      if (Math.abs(camGoal.x - cam.x) < .4 && Math.abs(camGoal.y - cam.y) < .4 && Math.abs(camGoal.s - cam.s) < .0008) { Object.assign(cam, camGoal); camGoal = null; }
+    }
+    applyCam();
+    const ease = reduce || dragActive ? 1 : .2;
+    let edgesDirty = dirty;
+    for (const id in views) {
+      const v = views[id]; if (v.el.hidden) continue;
+      const n = doc.nodes[id]; if (!n) continue;
+      const dx = n.x - v.x, dy = n.y - v.y;
+      if (Math.abs(dx) > .15 || Math.abs(dy) > .15) { v.x += dx * ease; v.y += dy * ease; } else { v.x = n.x; v.y = n.y; }
+      const tx = Math.round((v.x - v.w / 2) * 10) / 10, ty = Math.round((v.y - v.h / 2) * 10) / 10;
+      if (dirty || tx !== v.px || ty !== v.py) { v.el.style.transform = `translate(${tx}px,${ty}px)`; v.px = tx; v.py = ty; edgesDirty = true; }
+    }
+    if (edgesDirty) drawEdges();
+    if (edgesDirty || linksDirty) { drawLinks(); linksDirty = false; }
+    if (selLink && !$('#linkBar').hidden) placeLinkBar();
+    dirty = false;
+    drawSea(now);
+  }
+  let frameErr = false;
+  function frame(now) {
+    try { frameBody(now); } catch (err) { if (!frameErr) { frameErr = true; console.error('Mindsea frame error', err); } }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- pointer input ---------- */
+  const ptrs = new Map(); let gesture = null, lastTap = {}, dropEl = null;
+  const toWorld = (x, y) => ({ x: (x - cam.x) / cam.s, y: (y - cam.y) / cam.s });
+  function hitNode(w, exclude) {
+    for (const id in views) {
+      const v = views[id]; if (v.el.hidden || exclude.has(id)) continue;
+      if (Math.abs(w.x - v.x) < v.w / 2 + 6 && Math.abs(w.y - v.y) < v.h / 2 + 6) return id;
+    }
+    return null;
+  }
+  function setDrop(id) {
+    const el = id ? views[id].el : null;
+    if (dropEl === el) return;
+    if (dropEl) dropEl.classList.remove('drop');
+    dropEl = el; if (el) el.classList.add('drop');
+  }
+
+  stage.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const nodeEl = e.target.closest('.node');
+    if (editing) { if (nodeEl && nodeEl.dataset.id === editing) return; commitEdit(); }
+    const labEl = e.target.closest('.llabel');
+    if (labelEditing) { if (labEl && labEl.dataset.id === labelEditing) return; commitLabel(); }
+    if (linkFrom && !(nodeEl && nodeEl.dataset.id !== linkFrom)) { endLinking(); toast('Linking cancelled'); }
+    touched = true;
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+    if (ptrs.size === 2) {
+      $('#marquee').hidden = true;
+      if (gesture && gesture.type === 'drag' && gesture.moved) { setDrop(null); dragActive = false; document.body.classList.remove('dragging'); sync(); }
+      const [a, b] = [...ptrs.values()];
+      gesture = { type: 'pinch', d: Math.hypot(a.x - b.x, a.y - b.y) || 1, m: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, cam: Object.assign({}, cam) };
+      camGoal = null; return;
+    }
+    if (ptrs.size > 2) return;
+    camGoal = null;
+    if (labEl) {
+      const lid = labEl.dataset.id, now = performance.now();
+      selectLink(lid);
+      if (lastTap.id === 'L' + lid && now - lastTap.t < 380) { lastTap = {}; e.preventDefault(); setTimeout(() => editLabel(lid), 30); }
+      else lastTap = { id: 'L' + lid, t: now };
+      gesture = null; return;
+    }
+    if (nodeEl) {
+      const id = nodeEl.dataset.id;
+      if (e.target.closest('.fold')) { toggleFold(id); gesture = null; return; }
+      if (!linkFrom && (e.shiftKey || e.metaKey || e.ctrlKey)) { toggleMulti(id); gesture = null; return; }
+      const touch = e.pointerType !== 'mouse';
+      const group = !linkFrom && msel.has(id) && msel.size > 1;
+      if (!touch && !group && !linkFrom) select(id);
+      const subSet = new Set();
+      (group ? [...msel] : [id]).forEach(k => { if (doc.nodes[k]) subtree(k).forEach(d => subSet.add(d)); });
+      const sub = [...subSet];
+      gesture = { type: 'drag', id, sx: e.clientX, sy: e.clientY, moved: false, starts: sub.map(k => [k, N(k).x, N(k).y]), sub: subSet, drop: null, defer: touch || group || !!linkFrom, group, linkTo: linkFrom ? id : null };
+      if (touch) {
+        const g = gesture;
+        g.lp = setTimeout(() => {
+          if (gesture !== g || g.moved) return;
+          g.long = true; toggleMulti(id);
+          toast(msel.size > 1 ? `${msel.size} selected. Long-press more, then + Parent to group them.` : 'Long-press other ideas to select several.');
+        }, 480);
+      }
+    } else {
+      const hit = hitLink(toWorld(e.clientX, e.clientY));
+      if (!hit && (e.shiftKey || boxMode)) {
+        gesture = { type: 'box', sx: e.clientX, sy: e.clientY, base: e.shiftKey ? new Set(msel) : new Set(), hits: [], moved: false };
+        return;
+      }
+      if (hit) selectLink(hit);
+      gesture = { type: 'pan', sx: e.clientX, sy: e.clientY, cx: cam.x, cy: cam.y, moved: false, link: hit };
+    }
+  });
+
+  stage.addEventListener('pointermove', e => {
+    if (!ptrs.has(e.pointerId)) return;
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (!gesture) return;
+    if (gesture.type === 'pinch') {
+      if (ptrs.size < 2) return;
+      const [a, b] = [...ptrs.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y), m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const g = gesture.cam, s = clamp(g.s * d / gesture.d, .2, 2.6);
+      const wx = (gesture.m.x - g.x) / g.s, wy = (gesture.m.y - g.y) / g.s;
+      cam.s = s; cam.x = m.x - wx * s; cam.y = m.y - wy * s; return;
+    }
+    const dx = e.clientX - gesture.sx, dy = e.clientY - gesture.sy;
+    if (!gesture.moved && Math.hypot(dx, dy) < 5) return;
+    if (gesture.type === 'drag') {
+      if (!gesture.moved) { clearTimeout(gesture.lp); if (gesture.linkTo) { endLinking(); gesture.linkTo = null; } if (gesture.defer && !gesture.group) select(gesture.id); gesture.moved = true; snap(); dragActive = true; document.body.classList.add('dragging'); }
+      for (const [k, x, y] of gesture.starts) { N(k).x = x + dx / cam.s; N(k).y = y + dy / cam.s; }
+      if (!gesture.group) { gesture.drop = hitNode(toWorld(e.clientX, e.clientY), gesture.sub); setDrop(gesture.drop); }
+    } else if (gesture.type === 'box') {
+      gesture.moved = true;
+      const x0 = Math.min(gesture.sx, e.clientX), y0 = Math.min(gesture.sy, e.clientY), x1 = Math.max(gesture.sx, e.clientX), y1 = Math.max(gesture.sy, e.clientY);
+      const m = $('#marquee'); m.hidden = false;
+      m.style.left = x0 + 'px'; m.style.top = y0 + 'px'; m.style.width = (x1 - x0) + 'px'; m.style.height = (y1 - y0) + 'px';
+      const hits = [];
+      for (const id in views) {
+        const v = views[id]; if (v.el.hidden) continue;
+        const l = (v.x - v.w / 2) * cam.s + cam.x, rr = (v.x + v.w / 2) * cam.s + cam.x, t = (v.y - v.h / 2) * cam.s + cam.y, b = (v.y + v.h / 2) * cam.s + cam.y;
+        if (rr >= x0 && l <= x1 && b >= y0 && t <= y1) hits.push(id);
+      }
+      gesture.hits = hits;
+      for (const id in views) views[id].el.classList.toggle('sel', gesture.base.has(id) || hits.includes(id));
+    } else if (gesture.type === 'pan') {
+      if (!gesture.moved) { gesture.moved = true; document.body.classList.add('panning'); }
+      cam.x = gesture.cx + dx; cam.y = gesture.cy + dy;
+    }
+  });
+
+  function endPointer(e) {
+    if (!ptrs.has(e.pointerId)) return;
+    ptrs.delete(e.pointerId);
+    const g = gesture; if (!g) return;
+    if (g.type === 'pinch') { if (ptrs.size < 2) gesture = null; return; }
+    gesture = null;
+    document.body.classList.remove('panning', 'dragging');
+    if (g.type === 'box') {
+      $('#marquee').hidden = true;
+      if (!g.moved) { if (!g.base.size) select(null); return; }
+      const all = new Set([...g.base, ...g.hits]);
+      if (boxMode) setBoxMode(false);
+      if (!all.size) { select(null); return; }
+      selLink = null; msel = all; sel = g.hits.length ? g.hits[g.hits.length - 1] : [...all].pop(); refreshSel();
+      toast(all.size > 1 ? `${all.size} ideas selected. Drag any of them to move them together.` : '1 idea selected');
+      return;
+    }
+    if (g.type === 'drag') {
+      clearTimeout(g.lp);
+      dragActive = false; setDrop(null);
+      if (g.long) return;
+      if (!g.moved && g.linkTo && linkFrom) { const a = linkFrom; endLinking(); createLink(a, g.linkTo); return; }
+      if (!g.moved && g.defer) select(g.id);
+      if (g.moved) {
+        let attached = false;
+        if (g.drop && e.type === 'pointerup') attached = reparent(g.id, g.drop);
+        if (!attached) keepManualLayout(g.group ? [...msel] : [g.id]);
+        if (!attached && auto && N(g.id) && N(g.id).parent) { auto = false; updateAuto(); toast('Auto-arrange is off so your layout stays put. Tidy rearranges it.'); }
+        sync();
+      } else {
+        const now = performance.now();
+        if (lastTap.id === g.id && now - lastTap.t < 380) { lastTap = {}; startEdit(g.id); }
+        else lastTap = { id: g.id, t: now };
+      }
+    } else if (g.type === 'pan' && !g.moved && e.type === 'pointerup' && !g.link) {
+      const now = performance.now();
+      if (lastTap.id === 'bg' && now - lastTap.t < 380 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24) {
+        lastTap = {}; const w = toWorld(e.clientX, e.clientY); addFree(w.x, w.y);
+      } else { lastTap = { id: 'bg', t: now, x: e.clientX, y: e.clientY }; select(null); }
+    }
+  }
+  stage.addEventListener('pointerup', endPointer);
+  stage.addEventListener('pointercancel', endPointer);
+
+  stage.addEventListener('wheel', e => {
+    e.preventDefault();
+    const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+    zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * unit * (e.ctrlKey ? .01 : .0016)));
+  }, { passive: false });
+
+  /* ---------- keyboard ---------- */
+  function nav(key) {
+    if (!sel) return select(doc.root);
+    const a = N(sel); const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[key];
+    let best = null, bs = Infinity;
+    for (const id of visibleSet()) {
+      if (id === sel) continue; const b = N(id);
+      const dx = b.x - a.x, dy = b.y - a.y, along = dx * dir[0] + dy * dir[1];
+      if (along <= 4) continue;
+      const score = along + Math.abs(dx * dir[1] + dy * dir[0]) * 2.2;
+      if (score < bs) { bs = score; best = id; }
+    }
+    if (best) { select(best); ensureVisible(best); }
+  }
+
+  addEventListener('keydown', e => {
+    const tgt = e.target;
+    if (tgt.closest && tgt.closest('input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]')) return;
+    const openModal = document.querySelector('.modal:not([hidden])');
+    if (openModal) { if (e.key === 'Escape') closeModals(); return; }
+    const k = e.key, mod = e.metaKey || e.ctrlKey;
+    if (mod && k.toLowerCase() === 'z') { e.preventDefault(); return e.shiftKey ? doRedo() : doUndo(); }
+    if (mod && k.toLowerCase() === 'y') { e.preventDefault(); return doRedo(); }
+    if (mod && k.toLowerCase() === 's') { e.preventDefault(); if (!$('#bSave').hidden) saveCurrent(); return; }
+    if (mod || e.altKey) return;
+    const onControl = tgt.closest && tgt.closest('button, a, label, select');
+    if (onControl && (k === 'Tab' || k === 'Enter' || k === ' ')) return;
+    switch (k) {
+      case 'Tab': e.preventDefault(); if (e.shiftKey) addParent(sel); else addChild(sel || doc.root); break;
+      case 'Enter': e.preventDefault(); addSibling(sel); break;
+      case 'Delete': case 'Backspace': if (selLink) { e.preventDefault(); removeLink(selLink); } else if (sel) { e.preventDefault(); removeNode(sel); } break;
+      case 'F2': case ' ': e.preventDefault(); if (selLink) editLabel(selLink); else startEdit(sel || doc.root); break;
+      case 'Escape': if (!$('#tidyMenu').hidden) closeTidyMenu(); else if (linkFrom) { endLinking(); toast('Linking cancelled'); } else if (boxMode) setBoxMode(false); else if (!$('#drawer').hidden) closeDrawer(); else if (diving) toggleDive(false); else select(null); break;
+      case 'ArrowUp': case 'ArrowDown': case 'ArrowLeft': case 'ArrowRight': e.preventDefault(); nav(k); break;
+      case 'l': case 'L': startLinking(sel); break;
+      case 's': case 'S': setBoxMode(!boxMode); break;
+      case 'u': case 'U': if (e.shiftKey) foldAll(); else unfoldAll(); break;
+      case 'n': case 'N': addFreeCenter(); break;
+      case 'd': case 'D': toggleDive(); break;
+      case 't': case 'T': tidyNow(e.shiftKey ? 'arrange' : 'cleanup'); break;
+      case 'f': case 'F': fit(); break;
+      case 'a': case 'A': toggleAuto(); break;
+      case 'm': case 'M': $('#drawer').hidden ? openDrawer() : closeDrawer(); break;
+      case '?': case '/': openModalEl('#helpModal'); break;
+      default:
+        if (/^[1-6]$/.test(k) && sel) setColor(sel, PALETTE[+k - 1][1]);
+    }
+  });
+
+  /* ---------- chrome ---------- */
+  function updateDock() {
+    const has = !!sel && !!doc.nodes[sel];
+    $('#dockName').textContent = has ? (plain(N(sel).text) || 'untitled') : 'Click an idea to select it';
+    ['#bSib', '#bEdit', '#bFold', '#bDel', '#bLink'].forEach(s => $(s).disabled = !has);
+    const sl = selLink && linkById(selLink);
+    if (sl) $('#dockName').textContent = `${plain(N(sl.a).text)} ${ARROW[sl.dir]} ${plain(N(sl.b).text)}${sl.label ? ' · ' + sl.label : ''}`;
+    $('#bFold').disabled = !has || !N(sel).kids.length;
+    $('#bFold').textContent = has && N(sel).collapsed ? 'Unfold' : 'Fold';
+    $('#bDel').disabled = !has || sel === doc.root;
+    $('#bParent').disabled = !has || (msel.size < 2 && !N(sel).parent);
+    if (msel.size > 1) $('#dockName').textContent = `${msel.size} ideas selected · + Parent groups them`;
+    $('#bUndo').disabled = !undo.length; $('#bRedo').disabled = !redo.length;
+    const c = has ? colorOf(sel) : null;
+    document.querySelectorAll('.sw').forEach(b => { b.disabled = !has; b.classList.toggle('on', b.dataset.c === c); b.setAttribute('aria-pressed', String(b.dataset.c === c)); });
+  }
+  function updateCount() {
+    const n = Object.keys(doc.nodes).length;
+    $('#countTxt').textContent = n + (n === 1 ? ' idea' : ' ideas');
+  }
+  function updateAuto() { $('#bAuto').classList.toggle('on', auto); $('#bAuto').setAttribute('aria-pressed', String(auto)); }
+  function toggleAuto() {
+    auto = !auto; updateAuto();
+    if (auto) { snap(); sync(); toast('Auto-arrange on'); } else { scheduleSave(); toast('Auto-arrange off. Place ideas wherever you like.'); }
+  }
+  function tidyNow(mode = 'cleanup') {
+    closeTidyMenu();
+    if (editing) commitEdit();
+    snap();
+    sync({ nosave: true });
+    const area = sel && doc.nodes[sel] && sel !== doc.root && msel.size < 2 ? areaHost(sel) : null;
+    const hosts = area ? [area] : [doc.root, ...freeRoots()];
+    if (mode === 'sort') {
+      const coll = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+      hosts.forEach(h => subtree(h).forEach(k => N(k).kids.sort((x, y) => coll.compare(N(x).text, N(y).text))));
+    }
+    runLayout(mode === 'sort' ? 'arrange' : mode, hosts);
+    scheduleSave(); updateDock();
+    const where = area ? `around “${plain(N(area).text) || 'untitled'}”` : 'the whole map';
+    toast({ cleanup: `Cleaned up ${where}: snapped to the grid, overlaps fixed`, arrange: `Arranged ${where}`, sort: `Sorted ${where} A–Z` }[mode]);
+  }
+  function tidyScopeText() {
+    const area = sel && doc.nodes[sel] && sel !== doc.root && msel.size < 2 ? areaHost(sel) : null;
+    return area ? `Around “${plain(N(area).text) || 'untitled'}”` : 'Whole map';
+  }
+  function openTidyMenu() {
+    const m = $('#tidyMenu'), r = $('#bTidy').getBoundingClientRect();
+    $('#tidyScope').textContent = tidyScopeText();
+    m.hidden = false; $('#bTidy').classList.add('on'); $('#bTidy').setAttribute('aria-expanded', 'true');
+    m.style.top = (r.bottom + 8) + 'px';
+    m.style.left = clamp(r.left, 16, innerWidth - m.offsetWidth - 16) + 'px';
+    const f = m.querySelector('.tm'); if (f) f.focus();
+  }
+  function closeTidyMenu() {
+    if ($('#tidyMenu').hidden) return;
+    $('#tidyMenu').hidden = true; $('#bTidy').classList.remove('on'); $('#bTidy').setAttribute('aria-expanded', 'false');
+  }
+
+  let toastT;
+  function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+  PALETTE.forEach(([name, c], i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'sw'; b.dataset.c = c;
+    b.style.setProperty('--c', c); b.title = `${name} (${i + 1})`; b.setAttribute('aria-label', name);
+    b.addEventListener('click', () => setColor(sel, c));
+    $('#swatches').appendChild(b);
+  });
+
+  $('#bChild').addEventListener('click', () => addChild(sel || doc.root));
+  $('#bSib').addEventListener('click', () => addSibling(sel));
+  $('#bParent').addEventListener('click', () => addParent(sel));
+  $('#bFree').addEventListener('click', addFreeCenter);
+  $('#bUnfoldAll').addEventListener('click', unfoldAll);
+  $('#bFoldAll').addEventListener('click', foldAll);
+  $('#bBox').addEventListener('click', () => setBoxMode(!boxMode));
+  $('#bLink').addEventListener('click', () => linkFrom ? (endLinking(), toast('Linking cancelled')) : startLinking(sel));
+  document.querySelectorAll('#linkBar [data-dir]').forEach(b => b.addEventListener('click', () => setLinkDir(b.dataset.dir)));
+  $('#bFlip').addEventListener('click', flipLink);
+  $('#bLabel').addEventListener('click', () => editLabel(selLink));
+  $('#bUnlink').addEventListener('click', () => removeLink(selLink));
+  $('#bEdit').addEventListener('click', () => startEdit(sel));
+  $('#bFold').addEventListener('click', () => toggleFold(sel));
+  $('#bDel').addEventListener('click', () => removeNode(sel));
+  $('#bUndo').addEventListener('click', doUndo);
+  $('#bRedo').addEventListener('click', doRedo);
+  $('#bTidy').addEventListener('click', e => { e.stopPropagation(); $('#tidyMenu').hidden ? openTidyMenu() : closeTidyMenu(); });
+  document.querySelectorAll('#tidyMenu .tm').forEach(b => b.addEventListener('click', () => tidyNow(b.dataset.mode)));
+  document.addEventListener('pointerdown', e => { if (!$('#tidyMenu').hidden && !e.target.closest('#tidyMenu, #bTidy')) closeTidyMenu(); }, true);
+  $('#bFit').addEventListener('click', () => fit());
+  $('#bAuto').addEventListener('click', toggleAuto);
+  $('#bDive').addEventListener('click', () => toggleDive());
+  $('#bSurface').addEventListener('click', () => toggleDive(false));
+  $('#bHelp').addEventListener('click', () => openModalEl('#helpModal'));
+  $('#bLog').addEventListener('click', () => openModalEl('#logModal'));
+  $('#bMaps').addEventListener('click', () => $('#drawer').hidden ? openDrawer() : closeDrawer());
+  $('#bCloseDrawer').addEventListener('click', closeDrawer);
+  $('#bNewMap').addEventListener('click', newMap);
+
+  /* ---------- maps drawer ---------- */
+  let confirmDel = null;
+  function openDrawer() { if (editing) commitEdit(); persistNow(); confirmDel = null; renderDrawer(); $('#drawer').hidden = false; $('#bMaps').classList.add('on'); }
+  function closeDrawer() { $('#drawer').hidden = true; $('#bMaps').classList.remove('on'); }
+  function renderDrawer() {
+    const list = $('#mapList'); list.textContent = '';
+    const ids = Object.keys(store.maps).sort((a, b) => (store.maps[b].updated || 0) - (store.maps[a].updated || 0));
+    $('#mapCount').textContent = ids.length + (ids.length === 1 ? ' map' : ' maps');
+    for (const id of ids) {
+      const m = store.maps[id], li = document.createElement('li'); li.className = 'mapitem';
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'mapbtn' + (id === store.current ? ' cur' : '');
+      const st = document.createElement('strong'); st.textContent = m.name || 'Untitled map';
+      const sm = document.createElement('small');
+      const cnt = m.data && m.data.nodes ? Object.keys(m.data.nodes).length : 0;
+      sm.textContent = `${cnt} ideas · ${new Date(m.updated || Date.now()).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+      b.append(st, sm); b.addEventListener('click', () => { openMap(id); closeDrawer(); });
+      li.appendChild(b);
+      if (confirmDel === id) {
+        const y = document.createElement('button'); y.type = 'button'; y.className = 'key on'; y.textContent = 'Delete';
+        y.addEventListener('click', () => deleteMap(id));
+        const n = document.createElement('button'); n.type = 'button'; n.className = 'key'; n.textContent = 'Keep';
+        n.addEventListener('click', () => { confirmDel = null; renderDrawer(); });
+        li.append(y, n);
+      } else {
+        const d = document.createElement('button'); d.type = 'button'; d.className = 'key danger'; d.textContent = '×';
+        d.setAttribute('aria-label', 'Delete ' + (m.name || 'map'));
+        d.addEventListener('click', () => { confirmDel = id; renderDrawer(); });
+        li.appendChild(d);
+      }
+      list.appendChild(li);
+    }
+  }
+  function clearViews() {
+    for (const id in views) { views[id].el.remove(); delete views[id]; }
+    for (const id in paths) { paths[id].remove(); delete paths[id]; }
+    for (const lid in linkViews) { linkViews[lid].path.remove(); linkViews[lid].label.remove(); delete linkViews[lid]; }
+    selLink = null; labelEditing = null; endLinking();
+  }
+  function openMap(id, opts = {}) {
+    if (editing) commitEdit();
+    if (store.current !== id) persistNow();
+    if (diving) { diving = null; document.body.classList.remove('diving'); $('#bDive').classList.remove('on'); }
+    store.current = id; doc = JSON.parse(JSON.stringify(store.maps[id].data));
+    clearViews(); undo = []; redo = []; sel = null;
+    freshSpawn = true; sync({ tidy: !!opts.tidy }); fit(true);
+    for (const k in views) { views[k].x = N(k).x; views[k].y = N(k).y; }
+    $('#mapName').textContent = store.maps[id].name || '';
+    persistNow();
+  }
+  function newMap() {
+    if (editing) commitEdit();
+    persistNow();
+    const id = uid(); store.maps[id] = { name: 'Central idea', updated: Date.now(), data: makeDoc('Central idea') };
+    openMap(id); closeDrawer();
+    sel = doc.root; refreshSel(); startEdit(doc.root);
+    toast('New map. Name your center, then press Tab to branch out.');
+  }
+  function deleteMap(id) {
+    const name = store.maps[id] ? store.maps[id].name : 'map';
+    delete store.maps[id]; confirmDel = null;
+    if (id === store.current) {
+      store.current = null;
+      const rest = Object.keys(store.maps).sort((a, b) => (store.maps[b].updated || 0) - (store.maps[a].updated || 0));
+      if (rest.length) openMap(rest[0]); else { const nid = uid(); store.maps[nid] = { name: 'Central idea', updated: Date.now(), data: makeDoc('Central idea') }; openMap(nid); }
+    }
+    persistNow(); renderDrawer(); toast(`Deleted “${name}”`);
+  }
+
+  /* ---------- logbook: export / import ---------- */
+  function outline(id = doc.root, d = 0) { const n = N(id); return '  '.repeat(d) + '- ' + n.text.replace(/\n+/g, ' ') + '\n' + n.kids.map(k => outline(k, d + 1)).join(''); }
+  async function copyText(s, label) {
+    const ta = $('#logText'); ta.value = s;
+    try { await navigator.clipboard.writeText(s); toast(label + ' copied'); }
+    catch (e) { ta.focus(); ta.select(); toast('Text is selected below. Press Ctrl/⌘ C to copy.'); }
+  }
+  $('#bCopyJson').addEventListener('click', () => copyText(JSON.stringify({ app: 'mindsea', version: 1, name: plain(N(doc.root).text), map: doc }, null, 2), 'JSON'));
+  $('#bCopyOutline').addEventListener('click', () => copyText(fullOutline(), 'Outline'));
+
+  function cleanDoc(d) {
+    if (!d || typeof d !== 'object' || !d.nodes || !d.root || !d.nodes[d.root]) return null;
+    const out = { root: d.root, nodes: {} };
+    const walk = (id, parent) => {
+      const s = d.nodes[id]; if (!s || out.nodes[id]) return;
+      out.nodes[id] = { id, text: String(s.text == null ? '' : s.text).slice(0, 2000), parent, kids: [], x: +s.x || 0, y: +s.y || 0 };
+      if (s.color && /^#[0-9a-f]{3,8}$/i.test(s.color)) out.nodes[id].color = s.color;
+      if (s.side === 1 || s.side === -1) out.nodes[id].side = s.side;
+      if (s.collapsed) out.nodes[id].collapsed = true;
+      (Array.isArray(s.kids) ? s.kids : []).forEach(k => { if (d.nodes[k] && !out.nodes[k]) { out.nodes[id].kids.push(k); walk(k, id); } });
+    };
+    walk(d.root, null);
+    Object.keys(d.nodes).forEach(id => { const s = d.nodes[id]; if (!out.nodes[id] && s && s.parent == null) walk(id, null); });
+    out.links = (Array.isArray(d.links) ? d.links : []).filter(l => l && out.nodes[l.a] && out.nodes[l.b] && l.a !== l.b)
+      .map(l => ({ id: String(l.id || uid()), a: l.a, b: l.b, label: String(l.label || '').slice(0, 60), dir: ['both', 'to', 'none'].includes(l.dir) ? l.dir : 'both' }));
+    return out;
+  }
+  function parseOutline(text) {
+    const items = text.split(/\r?\n/).map(l => {
+      const m = l.replace(/\t/g, '    ').match(/^(\s*)(.*)$/);
+      const t = m[2].replace(/^(#{1,6}|[-*+•]|\d+[.)])\s+/, '').trim();
+      return { ind: m[1].length + ((m[2].match(/^#+/) || [''])[0].length * 2), text: t };
+    }).filter(i => i.text);
+    if (!items.length) return null;
+    const d = makeDoc(items[0].text); const stack = [{ ind: items[0].ind, id: d.root }];
+    for (const it of items.slice(1)) {
+      while (stack.length > 1 && stack[stack.length - 1].ind >= it.ind) stack.pop();
+      stack.push({ ind: it.ind, id: addRaw(d, stack[stack.length - 1].id, it.text) });
+    }
+    return d;
+  }
+  function fixTop(d) {
+    d.nodes[d.root].kids.forEach((k, i) => { const n = d.nodes[k]; if (n.side !== 1 && n.side !== -1) n.side = i % 2 ? -1 : 1; if (!n.color) n.color = PALETTE[i % 5][1]; });
+  }
+  function importMany(list) {
+    let first = null, n = 0;
+    for (const m of list) {
+      const d = m && cleanDoc(m.map || m.data || m); if (!d) continue;
+      fixTop(d);
+      const id = uid(); store.maps[id] = { name: plain(d.nodes[d.root].text) || 'Imported map', updated: Date.now() - n, data: d };
+      first = first || id; n++;
+    }
+    if (!n) return toast('No Mindsea maps found in that backup');
+    openMap(first); closeModals();
+    toast(n === 1 ? `Opened “${store.maps[first].name}”` : `Brought back ${n} maps. Find them all under Maps.`);
+  }
+
+  /* ---------- save to device ---------- */
+  const inArtifact = !!(window.claude && typeof window.claude.use === 'function');
+  let dl = null, dlReady = !inArtifact;
+  function hideSave() { document.querySelectorAll('.dl').forEach(el => { el.hidden = true; }); }
+  if (inArtifact) {
+    Promise.resolve(window.claude.use('downloads')).then(d => { dl = d; dlReady = true; if (!d) hideSave(); }).catch(() => { dlReady = true; hideSave(); });
+  }
+  const slug = t => (plain(t).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'map');
+  const stamp = () => { const d = new Date(), z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; };
+  async function saveFile(filename, data) {
+    if (editing) commitEdit();
+    if (labelEditing) commitLabel();
+    persistNow();
+    if (dl) {
+      try { await dl.save({ filename, data }); toast('Saved to your device'); }
+      catch (e) {
+        const c = e && e.code;
+        if (c === 'declined') toast('Save cancelled');
+        else if (c === 'rate_limited') toast('A save is already waiting for you. Try again in a moment.');
+        else toast('Saving files is not available here. Use Copy JSON in the Logbook instead.');
+      }
+      return;
+    }
+    if (!inArtifact) {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([data], { type: 'application/octet-stream' })); a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast('Saved to your device'); return;
+    }
+    toast(dlReady ? 'Saving files is not available here. Use Copy JSON in the Logbook instead.' : 'Still getting ready. Try again in a second.');
+  }
+  function saveCurrent() {
+    const name = plain(N(doc.root).text) || 'Untitled map';
+    saveFile(`mindsea-${slug(name)}-${stamp()}.json`, JSON.stringify({ app: 'mindsea', version: 1, name, saved: new Date().toISOString(), map: doc }, null, 2));
+  }
+  function saveAll() {
+    persistNow();
+    const maps = Object.values(store.maps).sort((a, b) => (b.updated || 0) - (a.updated || 0)).map(m => ({ name: m.name, map: m.data }));
+    saveFile(`mindsea-all-maps-${stamp()}.json`, JSON.stringify({ app: 'mindsea', version: 1, saved: new Date().toISOString(), maps }, null, 2));
+  }
+  function saveOutline() { saveFile(`mindsea-${slug(N(doc.root).text)}-${stamp()}.md`, fullOutline()); }
+  $('#bSave').addEventListener('click', saveCurrent);
+  $('#bSaveMap').addEventListener('click', saveCurrent);
+  $('#bSaveAll').addEventListener('click', saveAll);
+  $('#bSaveMd').addEventListener('click', saveOutline);
+
+  function importText(text) {
+    let d = null, layout = false;
+    const tt = text.trim(); if (!tt) return toast('Paste a JSON backup or an outline first');
+    if (tt[0] === '{') {
+      let j = null; try { j = JSON.parse(tt); } catch (e) {}
+      if (j && Array.isArray(j.maps)) return importMany(j.maps);
+      d = j ? cleanDoc(j.map || j) : null;
+      if (!d) return toast('That JSON is not a Mindsea map. Check that it has "root" and "nodes".');
+    } else { d = parseOutline(tt); layout = true; if (!d) return toast('No ideas found in that text'); }
+    fixTop(d);
+    const id = uid(); store.maps[id] = { name: plain(d.nodes[d.root].text) || 'Imported map', updated: Date.now(), data: d };
+    openMap(id, { tidy: layout });
+    closeModals(); toast(`Opened “${store.maps[id].name}” with ${Object.keys(d.nodes).length} ideas`);
+  }
+  $('#bLoadText').addEventListener('click', () => importText($('#logText').value));
+  $('#fileIn').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const r = new FileReader(); r.onload = () => importText(String(r.result || '')); r.onerror = () => toast('Could not read that file');
+    r.readAsText(f); e.target.value = '';
+  });
+
+  /* ---------- modals ---------- */
+  let lastFocus = null;
+  function openModalEl(s) { if (editing) commitEdit(); lastFocus = document.activeElement; const m = $(s); m.hidden = false; const f = m.querySelector('button'); if (f) f.focus(); }
+  function closeModals() { document.querySelectorAll('.modal').forEach(m => m.hidden = true); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+  document.querySelectorAll('.modal').forEach(m => {
+    m.addEventListener('click', e => { if (e.target === m || e.target.closest('[data-close]')) closeModals(); });
+  });
+
+  /* ---------- boot ---------- */
+  loadStore();
+  auto = store.auto !== false; updateAuto();
+  let firstVisit = false;
+  if (!store.current || !store.maps[store.current]) {
+    const ids = Object.keys(store.maps);
+    if (ids.length) store.current = ids[0];
+    else { firstVisit = true; const id = uid(); store.maps[id] = { name: 'Sea of my mind', updated: Date.now(), data: sampleDoc() }; store.current = id; }
+  }
+  const startId = store.current;
+  store.current = null;
+  resize();
+  store.current = startId;
+  doc = JSON.parse(JSON.stringify(store.maps[startId].data));
+  freshSpawn = true; sync({ tidy: firstVisit, nosave: !firstVisit }); fit(true);
+  for (const k in views) { views[k].x = N(k).x; views[k].y = N(k).y; }
+  $('#mapName').textContent = store.maps[startId].name || '';
+  if (firstVisit) persistNow(); else setSave('Saved');
+  if (!storageOK) setSave('Not saved: browser storage is off. Copy from the Logbook to keep it.', true);
+  if (!reduce) { const goal = Object.assign({}, cam); cam.s *= .7; cam.x = innerWidth / 2 - (innerWidth / 2 - goal.x) * .7; cam.y = innerHeight / 2 - (innerHeight / 2 - goal.y) * .7; camGoal = goal; }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { sync({ nosave: true }); if (!touched) fit(); });
+  addEventListener('resize', resize);
+  requestAnimationFrame(frame);
+  setTimeout(() => toast(firstVisit ? 'A sample map to start. Edit anything, or open Maps for a fresh one.' : 'Welcome back. Your sea is where you left it.'), 600);
+})();
+</script>
+</body>
+</html>
