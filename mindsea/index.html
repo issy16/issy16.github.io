@@ -328,6 +328,7 @@ body.diving #grid { opacity: .25; }
       <button class="key" id="bFit" type="button">Fit <kbd>F</kbd></button>
       <button class="key on" id="bAuto" type="button" aria-pressed="true">Auto <kbd>A</kbd></button>
       <button class="key dl" id="bSave" type="button" title="Save this map as a file on your device">Save <kbd>⌘S</kbd></button>
+      <button class="key dl" id="bExport" type="button" aria-haspopup="menu" aria-expanded="false">Export ▾</button>
       <button class="key" id="bLog" type="button">Logbook</button>
       <button class="key" id="bDive" type="button" aria-pressed="false">Dive <kbd>D</kbd></button>
       <button class="key" id="bHelp" type="button" aria-label="Keyboard shortcuts">?</button>
@@ -396,6 +397,13 @@ body.diving #grid { opacity: .25; }
   </div>
 </div>
 
+<div class="tidymenu panel" id="exportMenu" hidden role="menu" aria-label="Export options">
+  <div class="panel-label"><span class="hot">Export</span><span>Save a copy to your device</span></div>
+  <button class="tm" type="button" role="menuitem" data-x="png"><b>Image <kbd>.png</kbd></b><small>The whole map on the dark sea, sharp enough to share or print. Folded branches stay folded.</small></button>
+  <button class="tm" type="button" role="menuitem" data-x="md"><b>Outline <kbd>.md</kbd></b><small>An indented list for notes and documents.</small></button>
+  <button class="tm" type="button" role="menuitem" data-x="json"><b>Map file <kbd>.json</kbd></b><small>A full backup you can open again with Logbook → Open file.</small></button>
+</div>
+
 <aside class="drawer panel" id="drawer" hidden aria-label="Your maps">
   <div class="panel-label"><span class="hot">Maps</span><span id="mapCount"></span></div>
   <ul class="maplist" id="mapList"></ul>
@@ -453,7 +461,7 @@ body.diving #grid { opacity: .25; }
       <dt>Shift + T</dt><dd>Arrange fresh. Both work around the selected idea, or the whole map when nothing is selected</dd>
       <dt>F · A · M</dt><dd>Fit to screen · Auto-arrange · Maps</dd>
       <dt>Ctrl/⌘ Z · Shift Z</dt><dd>Undo · Redo</dd>
-      <dt>Ctrl/⌘ S</dt><dd>Save this map as a file on your device</dd>
+      <dt>Ctrl/⌘ S</dt><dd>Save this map as a file on your device. Export ▾ also saves it as an image</dd>
     </dl>
     <p class="subhead">Mouse &amp; touch</p>
     <dl class="shortcuts">
@@ -1516,7 +1524,7 @@ body.diving #grid { opacity: .25; }
       case 'Enter': e.preventDefault(); addSibling(sel); break;
       case 'Delete': case 'Backspace': if (selLink) { e.preventDefault(); removeLink(selLink); } else if (sel) { e.preventDefault(); removeNode(sel); } break;
       case 'F2': case ' ': e.preventDefault(); if (selLink) editLabel(selLink); else startEdit(sel || doc.root); break;
-      case 'Escape': if (!$('#colorMenu').hidden) closeColorMenu(); else if (!$('#tidyMenu').hidden) closeTidyMenu(); else if (linkFrom) { endLinking(); toast('Linking cancelled'); } else if (boxMode) setBoxMode(false); else if (!$('#drawer').hidden) closeDrawer(); else if (diving) toggleDive(false); else select(null); break;
+      case 'Escape': if (!$('#exportMenu').hidden) closeExportMenu(); else if (!$('#colorMenu').hidden) closeColorMenu(); else if (!$('#tidyMenu').hidden) closeTidyMenu(); else if (linkFrom) { endLinking(); toast('Linking cancelled'); } else if (boxMode) setBoxMode(false); else if (!$('#drawer').hidden) closeDrawer(); else if (diving) toggleDive(false); else select(null); break;
       case 'ArrowUp': case 'ArrowDown': case 'ArrowLeft': case 'ArrowRight': e.preventDefault(); nav(k); break;
       case 'l': case 'L': startLinking(sel); break;
       case 's': case 'S': setBoxMode(!boxMode); break;
@@ -1848,6 +1856,134 @@ body.diving #grid { opacity: .25; }
     saveFile(`mindsea-all-maps-${stamp()}.json`, JSON.stringify({ app: 'mindsea', version: 1, saved: new Date().toISOString(), maps }, null, 2));
   }
   function saveOutline() { saveFile(`mindsea-${slug(N(doc.root).text)}-${stamp()}.md`, fullOutline()); }
+
+  /* ---------- export as image ---------- */
+  const hexRgb = h => { const m = /^#?([0-9a-f]{6})$/i.exec(h || ''); const v = m ? parseInt(m[1], 16) : 0xff5c97; return [v >> 16 & 255, v >> 8 & 255, v & 255]; };
+  const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+  const blend = (c, base, t) => `rgb(${c.map((v, i) => Math.round(base[i] + (v - base[i]) * t)).join(',')})`;
+  function wrapText(cx, text, maxW) {
+    const lines = [];
+    for (const para of String(text).split('\n')) {
+      const toks = para.match(/[⺀-鿿豈-﫿＀-￯　-〿]|[^\s⺀-鿿豈-﫿＀-￯　-〿]+|\s+/g) || [''];
+      let line = '';
+      for (let tok of toks) {
+        if (cx.measureText(line + tok).width <= maxW || !line.trim()) {
+          if (!line.trim() && cx.measureText(tok).width > maxW) {           // a single very long word: break it
+            for (const ch of tok) { if (cx.measureText(line + ch).width > maxW && line) { lines.push(line); line = ''; } line += ch; }
+          } else line += tok;
+        } else { lines.push(line.trimEnd()); line = tok.trimStart(); }
+      }
+      lines.push(line.trimEnd());
+    }
+    return lines;
+  }
+  async function exportPNG() {
+    closeExportMenu();
+    if (editing) commitEdit();
+    if (labelEditing) commitLabel();
+    try { await Promise.all(['400 20px Silkscreen', '600 15px "IBM Plex Mono"', '400 14px "IBM Plex Sans"', '400 11px Silkscreen'].map(f => document.fonts.load(f))); } catch (e) {}
+    const vis = [...visibleSet()];
+    const box = id => { const n = N(id), z = size(id); return { x: n.x, y: n.y, w: z.w, h: z.h }; };
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    vis.forEach(id => { const b = box(id); x0 = Math.min(x0, b.x - b.w / 2); x1 = Math.max(x1, b.x + b.w / 2); y0 = Math.min(y0, b.y - b.h / 2); y1 = Math.max(y1, b.y + b.h / 2); });
+    for (const l of doc.links) { const lv = linkViews[l.id]; if (lv && !lv.hidden && lv.geo) for (const q of lv.geo) { x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); } }
+    const pad = 72, Wd = x1 - x0 + pad * 2, Hd = y1 - y0 + pad * 2;
+    const scale = Math.min(2, 8000 / Math.max(Wd, Hd));
+    const cv = document.createElement('canvas'); cv.width = Math.ceil(Wd * scale); cv.height = Math.ceil(Hd * scale);
+    const cx = cv.getContext('2d');
+    cx.scale(scale, scale);
+    // the sea
+    const g = cx.createLinearGradient(0, 0, 0, Hd);
+    g.addColorStop(0, '#112a52'); g.addColorStop(.55, '#081a36'); g.addColorStop(1, '#040b1c');
+    cx.fillStyle = g; cx.fillRect(0, 0, Wd, Hd);
+    cx.strokeStyle = 'rgba(128,156,214,.06)'; cx.lineWidth = 1;
+    for (let gx = 0; gx < Wd; gx += 32) { cx.beginPath(); cx.moveTo(gx + .5, 0); cx.lineTo(gx + .5, Hd); cx.stroke(); }
+    for (let gy = 0; gy < Hd; gy += 32) { cx.beginPath(); cx.moveTo(0, gy + .5); cx.lineTo(Wd, gy + .5); cx.stroke(); }
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < Math.min(400, Wd * Hd / 9000); i++) {
+      const px = rnd() * Wd, py = rnd() * Hd, z = rnd();
+      if (rnd() < .12) { const col = rnd() < .6 ? '255,92,151' : '83,216,234', rr = 4 + 12 * z; const rg = cx.createRadialGradient(px, py, 0, px, py, rr); rg.addColorStop(0, `rgba(${col},.35)`); rg.addColorStop(1, `rgba(${col},0)`); cx.fillStyle = rg; cx.fillRect(px - rr, py - rr, rr * 2, rr * 2); }
+      else { cx.fillStyle = `rgba(190,215,255,${.08 + .3 * z})`; const sz = z > .75 ? 2 : 1; cx.fillRect(Math.round(px), Math.round(py), sz, sz); }
+    }
+    cx.translate(pad - x0, pad - y0);
+    // branches
+    cx.lineCap = 'round';
+    for (const id of vis) {
+      const n = N(id); if (!n.parent) continue;
+      const a = box(n.parent), b = box(id), right = b.x >= a.x;
+      const xa = a.x + (right ? 1 : -1) * (a.w / 2 - (n.parent === doc.root ? 6 : 0)), xb = b.x + (right ? -1 : 1) * b.w / 2, m = (xa + xb) / 2;
+      cx.strokeStyle = rgba(hexRgb(colorOf(id)), .72); cx.lineWidth = slv(id) === 1 ? 3 : 2;
+      cx.beginPath(); cx.moveTo(xa, a.y); cx.bezierCurveTo(m, a.y, m, b.y, xb, b.y); cx.stroke();
+    }
+    // links
+    const LINK = [191, 230, 245];
+    const arrow = (tip, from) => { const ang = Math.atan2(tip.y - from.y, tip.x - from.x); cx.save(); cx.translate(tip.x, tip.y); cx.rotate(ang); cx.fillStyle = rgba(LINK, 1); cx.beginPath(); cx.moveTo(2, 0); cx.lineTo(-9, -5.5); cx.lineTo(-9, 5.5); cx.closePath(); cx.fill(); cx.restore(); };
+    for (const l of doc.links) {
+      const lv = linkViews[l.id]; if (!lv || lv.hidden || !lv.geo) continue;
+      const [p0, c, p2] = lv.geo;
+      cx.save(); cx.setLineDash([7, 5]); cx.lineCap = 'butt'; cx.strokeStyle = rgba(LINK, .85); cx.lineWidth = 2;
+      cx.beginPath(); cx.moveTo(p0.x, p0.y); cx.quadraticCurveTo(c.x, c.y, p2.x, p2.y); cx.stroke(); cx.restore();
+      if (l.dir !== 'none') arrow(p2, c);
+      if (l.dir === 'both') arrow(p0, c);
+      if (l.label) {
+        cx.font = '400 11px Silkscreen, "Courier New", monospace'; if ('letterSpacing' in cx) cx.letterSpacing = '0.66px';
+        const t = l.label.toUpperCase(), tw = cx.measureText(t).width, bw = tw + 16, bh = 20;
+        cx.fillStyle = '#050914'; cx.fillRect(lv.mx - bw / 2, lv.my - bh / 2, bw, bh);
+        cx.save(); cx.setLineDash([4, 3]); cx.strokeStyle = rgba(LINK, 1); cx.lineWidth = 1.5; cx.strokeRect(lv.mx - bw / 2, lv.my - bh / 2, bw, bh); cx.restore();
+        cx.fillStyle = rgba(LINK, 1); cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText(t, lv.mx, lv.my + 1);
+        if ('letterSpacing' in cx) cx.letterSpacing = '0px';
+      }
+    }
+    // ideas
+    const PANEL = [13, 21, 40];
+    for (const id of vis) {
+      const n = N(id), b = box(id), col = hexRgb(colorOf(id)), lvl = slv(id), root = id === doc.root;
+      const L = b.x - b.w / 2, T = b.y - b.h / 2;
+      cx.fillStyle = root ? rgba(col.map(v => v * .62), 1) : rgba(col, .28);
+      cx.fillRect(L + (root ? 4 : 3), T + (root ? 4 : 3), b.w, b.h);
+      if (root) { cx.save(); cx.shadowColor = rgba(col, .45); cx.shadowBlur = 48; cx.fillStyle = rgba(col, 1); cx.fillRect(L, T, b.w, b.h); cx.restore(); }
+      cx.fillStyle = root ? rgba(col, 1) : blend(col, PANEL, .11); cx.fillRect(L, T, b.w, b.h);
+      cx.strokeStyle = root ? blend([255, 255, 255], col, .45) : rgba(col, .62); cx.lineWidth = 1.5; cx.strokeRect(L + .75, T + .75, b.w - 1.5, b.h - 1.5);
+      if (!n.parent && !root) { cx.save(); cx.setLineDash([4, 3]); cx.strokeStyle = rgba(col, .45); cx.strokeRect(L - 6, T - 6, b.w + 12, b.h + 12); cx.restore(); }
+      const fs = root ? 20 : lvl === 1 ? 15 : 14, lh = root ? 24 : fs * 1.35, padX = root ? 20 : lvl === 1 ? 14 : 11;
+      cx.font = root ? '400 20px Silkscreen, "Courier New", monospace' : lvl === 1 ? '600 15px "IBM Plex Mono", ui-monospace, monospace' : '400 14px "IBM Plex Sans", system-ui, sans-serif';
+      if ('letterSpacing' in cx) cx.letterSpacing = root ? '0.8px' : '0px';
+      const lines = wrapText(cx, n.text || ' ', b.w - padX * 2 - 1);
+      cx.fillStyle = root ? (lum(colorOf(id)) > .3 ? '#1c0712' : '#f4f6ff') : '#e8ecf8';
+      cx.textBaseline = 'middle'; cx.textAlign = root ? 'center' : 'left';
+      const startY = b.y - (lines.length - 1) * lh / 2;
+      lines.forEach((ln, i) => cx.fillText(ln, root ? b.x : L + padX, startY + i * lh + 1));
+      if ('letterSpacing' in cx) cx.letterSpacing = '0px';
+      if (n.collapsed && n.kids.length) {
+        const t = '+' + countDesc(id); cx.font = '400 10px Silkscreen, monospace'; const tw = cx.measureText(t).width + 10;
+        const bx = (n.parent && n.x < N(n.parent).x) ? L - 12 - tw / 2 : L + b.w + 12 - tw / 2;
+        cx.fillStyle = '#131e38'; cx.fillRect(bx, b.y - 8, tw, 16); cx.strokeStyle = rgba(col, 1); cx.strokeRect(bx + .75, b.y - 7.25, tw - 1.5, 14.5);
+        cx.fillStyle = '#e8ecf8'; cx.textAlign = 'center'; cx.fillText(t, bx + tw / 2, b.y + 1);
+      }
+    }
+    cv.toBlob(blob => {
+      if (!blob) return toast('Could not draw the image. Try folding some branches first.');
+      saveFile(`mindsea-${slug(N(doc.root).text)}-${stamp()}.png`, blob);
+    }, 'image/png');
+  }
+  function openExportMenu() {
+    closeTidyMenu(); closeColorMenu();
+    const m = $('#exportMenu'), r = $('#bExport').getBoundingClientRect();
+    m.hidden = false; $('#bExport').classList.add('on'); $('#bExport').setAttribute('aria-expanded', 'true');
+    m.style.top = (r.bottom + 8) + 'px';
+    m.style.left = clamp(r.right - m.offsetWidth, 16, innerWidth - m.offsetWidth - 16) + 'px';
+    const f = m.querySelector('.tm'); if (f) f.focus();
+  }
+  function closeExportMenu() {
+    if ($('#exportMenu').hidden) return;
+    $('#exportMenu').hidden = true; $('#bExport').classList.remove('on'); $('#bExport').setAttribute('aria-expanded', 'false');
+  }
+  $('#bExport').addEventListener('click', e => { e.stopPropagation(); $('#exportMenu').hidden ? openExportMenu() : closeExportMenu(); });
+  document.addEventListener('pointerdown', e => { if (!$('#exportMenu').hidden && !e.target.closest('#exportMenu, #bExport')) closeExportMenu(); }, true);
+  document.querySelectorAll('#exportMenu .tm').forEach(b => b.addEventListener('click', () => {
+    const x = b.dataset.x; closeExportMenu();
+    if (x === 'png') exportPNG(); else if (x === 'md') saveOutline(); else saveCurrent();
+  }));
   $('#bSave').addEventListener('click', saveCurrent);
   $('#bSaveMap').addEventListener('click', saveCurrent);
   $('#bSaveAll').addEventListener('click', saveAll);
