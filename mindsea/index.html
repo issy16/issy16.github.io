@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap">
 <style>
 /* Layout: a full-bleed abyss you pan and zoom through. Pixel "music software" chrome floats on top:
-   menu bar above, node dock + transport bar below, depth gauge on the right. Zooming in = sinking deeper. */
+   menu bar above, node dock below, depth gauge on the right. Zooming in = sinking deeper. */
 :root {
   color-scheme: dark;
   --abyss: #050914;
@@ -177,7 +177,7 @@ body.dragging, body.dragging .node { cursor: grabbing; }
 /* ---------- dock ---------- */
 .dock {
   position: fixed; z-index: 20; left: 50%; transform: translateX(-50%);
-  bottom: calc(50px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   width: max-content; max-width: calc(100% - 32px);
   padding: 8px 10px 10px; display: grid; gap: 7px;
   background: rgba(13, 21, 40, .9); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
@@ -194,23 +194,10 @@ body.dragging, body.dragging .node { cursor: grabbing; }
 .sw.on { outline: 2px solid var(--ink); outline-offset: 2px; }
 .sw:disabled { opacity: .3; cursor: not-allowed; }
 
-/* ---------- transport ---------- */
-.transport {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-  display: flex; align-items: center; gap: 12px;
-  padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px));
-  padding-left: var(--gutter-l); padding-right: var(--gutter-r);
-  background: rgba(8, 13, 26, .9); border-top: 1.5px solid var(--line);
-  font-family: var(--label); font-size: 12px; color: var(--muted);
-}
-.transport .play { width: 0; height: 0; border-left: 10px solid var(--pink); border-top: 6px solid transparent; border-bottom: 6px solid transparent; flex: none; transform: rotate(90deg); }
-.track { position: relative; flex: 1; min-width: 40px; height: 2px; background: var(--line); }
-.track span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--pink); width: 0; }
-.track span::after { content: ""; position: absolute; right: -5px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 12px var(--pink); }
-.time { white-space: nowrap; color: var(--ink); font-variant-numeric: tabular-nums; }
+/* ---------- status (top bar) ---------- */
+.status { font-family: var(--label); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; display: flex; gap: 10px; }
 .tstat { white-space: nowrap; }
 .tstat.warn { color: var(--pink-ink); }
-.transport .key { padding: 3px 8px; font-size: 11px; }
 
 /* ---------- depth gauge ---------- */
 .gauge {
@@ -253,7 +240,7 @@ body.diving #grid { opacity: .25; }
 /* ---------- drawer & modals ---------- */
 .drawer {
   position: fixed; z-index: 30; left: var(--gutter-l);
-  top: calc(70px + env(safe-area-inset-top, 0px)); bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  top: calc(70px + env(safe-area-inset-top, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   width: min(330px, calc(100% - 32px)); padding: 12px; display: flex; flex-direction: column; gap: 12px;
   box-shadow: 6px 6px 0 rgba(255, 92, 151, .28);
 }
@@ -288,7 +275,7 @@ body.diving #grid { opacity: .25; }
 .subhead { font-family: var(--label); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 4px 0 0; }
 
 .toast {
-  position: fixed; left: 50%; z-index: 50; bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+  position: fixed; left: 50%; z-index: 50; bottom: calc(112px + env(safe-area-inset-bottom, 0px));
   transform: translate(-50%, 12px); max-width: calc(100% - 32px);
   background: var(--panel-2); color: var(--ink); font-family: var(--mono); font-size: 13px;
   padding: 10px 16px; border: 1.5px solid var(--pink); box-shadow: 4px 4px 0 var(--pink);
@@ -297,12 +284,12 @@ body.diving #grid { opacity: .25; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 @media (max-width: 640px) {
-  .gauge { display: none; }
+  .gauge { height: min(34vh, 240px); width: 22px; }
+  .gauge-ends { display: none; }
   .brand .mapname { display: none; }
   .key kbd { display: none; }
   .menu .key { padding: 5px 8px; font-size: 11px; }
-  .tstat.hide-sm { display: none; }
-  .dock { bottom: calc(48px + env(safe-area-inset-bottom, 0px)); }
+  .status { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .chrome, .node, .toast, .dive-hud { transition: none; }
@@ -328,7 +315,7 @@ body.diving #grid { opacity: .25; }
 
 <header class="topbar chrome">
   <div class="topbar-inner">
-    <div class="brand"><span class="dots"><i></i><i></i><i></i></span><b>MINDSEA</b><span class="mapname" id="mapName"></span></div>
+    <div class="brand"><span class="dots"><i></i><i></i><i></i></span><b>MINDSEA</b><span class="mapname" id="mapName"></span><span class="status" aria-live="polite"><span class="tstat" id="countTxt">0 ideas</span><span class="tstat" id="saveTxt">Saved</span></span></div>
     <nav class="menu" aria-label="Map controls">
       <button class="key" id="bMaps" type="button">Maps <kbd>M</kbd></button>
       <button class="key" id="bTidy" type="button" aria-haspopup="menu" aria-expanded="false">Tidy ▾</button>
@@ -337,6 +324,7 @@ body.diving #grid { opacity: .25; }
       <button class="key dl" id="bSave" type="button" title="Save this map as a file on your device">Save <kbd>⌘S</kbd></button>
       <button class="key" id="bLog" type="button">Logbook</button>
       <button class="key" id="bDive" type="button" aria-pressed="false">Dive <kbd>D</kbd></button>
+      <button class="key" id="bHelp" type="button" aria-label="Keyboard shortcuts">?</button>
     </nav>
   </div>
 </header>
@@ -369,15 +357,6 @@ body.diving #grid { opacity: .25; }
   </div>
 </section>
 
-<footer class="transport">
-  <span class="play" aria-hidden="true"></span>
-  <span>Depth</span>
-  <div class="track" aria-hidden="true"><span id="trackFill"></span></div>
-  <span class="time" id="depthTxt">0 M</span>
-  <span class="tstat hide-sm" id="countTxt">0 nodes</span>
-  <span class="tstat hide-sm" id="saveTxt">Saved</span>
-  <button class="key" id="bHelp" type="button" aria-label="Keyboard shortcuts">?</button>
-</footer>
 
 <div class="dive-hud" aria-live="polite">
   <p>Diving toward · <b id="diveName"></b></p>
@@ -1151,7 +1130,7 @@ body.diving #grid { opacity: .25; }
     cam.s = ns; cam.x = x - wx * ns; cam.y = y - wy * ns;
   }
   const chromeTop = () => document.body.classList.contains('diving') ? 60 : $('.topbar').offsetHeight;
-  const chromeBottom = () => $('.transport').offsetHeight + (document.body.classList.contains('diving') ? 0 : $('.dock').offsetHeight + 14);
+  const chromeBottom = () => 12 + (document.body.classList.contains('diving') ? 0 : $('.dock').offsetHeight + 14);
 
   function fit(instant) {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -1284,8 +1263,7 @@ body.diving #grid { opacity: .25; }
     const dt = Math.round(depthShown) + ' M';
     if (dt !== lastDepthTxt) {
       lastDepthTxt = dt;
-      $('#depthTxt').textContent = dt; $('#gaugeTxt').textContent = dt;
-      $('#trackFill').style.width = (k * 100).toFixed(1) + '%';
+      $('#gaugeTxt').textContent = dt;
       $('#gaugeMark').style.top = (k * 100).toFixed(1) + '%';
     }
   }
