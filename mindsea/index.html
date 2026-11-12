@@ -746,7 +746,14 @@ body.diving #grid { opacity: .25; }
   }
   function applyRel(id) {
     const n = N(id); if (n.collapsed) return;
-    for (const k of n.kids) { const r = layoutRel[k]; if (!r) continue; N(k).x = n.x + r.x; N(k).y = n.y + r.y; applyRel(k); }
+    for (const k of n.kids) {
+      const r = layoutRel[k]; if (!r) continue;
+      const c = N(k), dx = n.x + r.x - c.x, dy = n.y + r.y - c.y;
+      c.x += dx; c.y += dy;
+      // folded ideas carry their hidden branches along, so unfolding finds them in place
+      if (c.collapsed && (dx || dy)) subtree(k).forEach(d => { if (d !== k) { N(d).x += dx; N(d).y += dy; } });
+      applyRel(k);
+    }
   }
   function runLayout(mode, hosts) {
     layoutMode = mode; layoutRel = {};
