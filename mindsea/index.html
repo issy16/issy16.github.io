@@ -327,8 +327,7 @@ body.diving #grid { opacity: .25; }
       <button class="key" id="bTidy" type="button" aria-haspopup="menu" aria-expanded="false">Tidy ▾</button>
       <button class="key" id="bFit" type="button">Fit <kbd>F</kbd></button>
       <button class="key on" id="bAuto" type="button" aria-pressed="true">Auto <kbd>A</kbd></button>
-      <button class="key dl" id="bSave" type="button" title="Save this map as a file on your device">Save <kbd>⌘S</kbd></button>
-      <button class="key dl" id="bExport" type="button" aria-haspopup="menu" aria-expanded="false">Export ▾</button>
+      <button class="key dl" id="bExport" type="button" aria-haspopup="menu" aria-expanded="false">Save as ▾</button>
       <button class="key" id="bLog" type="button">Logbook</button>
       <button class="key" id="bDive" type="button" aria-pressed="false">Dive <kbd>D</kbd></button>
       <button class="key" id="bHelp" type="button" aria-label="Keyboard shortcuts">?</button>
@@ -397,11 +396,12 @@ body.diving #grid { opacity: .25; }
   </div>
 </div>
 
-<div class="tidymenu panel" id="exportMenu" hidden role="menu" aria-label="Export options">
-  <div class="panel-label"><span class="hot">Export</span><span>Save a copy to your device</span></div>
-  <button class="tm" type="button" role="menuitem" data-x="png"><b>Image <kbd>.png</kbd></b><small>The whole map on the dark sea, sharp enough to share or print. Folded branches stay folded.</small></button>
-  <button class="tm" type="button" role="menuitem" data-x="md"><b>Outline <kbd>.md</kbd></b><small>An indented list for notes and documents.</small></button>
-  <button class="tm" type="button" role="menuitem" data-x="json"><b>Map file <kbd>.json</kbd></b><small>A full backup you can open again with Logbook → Open file.</small></button>
+<div class="tidymenu panel" id="exportMenu" hidden role="menu" aria-label="Save as options">
+  <div class="panel-label"><span class="hot">Save as</span><span>⌘S · ↑↓ · Enter</span></div>
+  <button class="tm" type="button" role="menuitem" data-x="png"><b>Image <kbd>.png</kbd></b></button>
+  <button class="tm" type="button" role="menuitem" data-x="md"><b>Outline <kbd>.md</kbd></b></button>
+  <button class="tm" type="button" role="menuitem" data-x="json"><b>Map file <kbd>.json</kbd></b></button>
+  <button class="tm" type="button" role="menuitem" data-x="all"><b>All maps <kbd>.json</kbd></b></button>
 </div>
 
 <aside class="drawer panel" id="drawer" hidden aria-label="Your maps">
@@ -416,13 +416,7 @@ body.diving #grid { opacity: .25; }
 <div class="modal" id="logModal" hidden>
   <div class="mbox panel" role="dialog" aria-modal="true" aria-labelledby="logTitle">
     <h2 id="logTitle">Logbook</h2>
-    <p>Your maps save automatically in this browser. To keep a copy that survives cleared browser data or moves to another device, save a file to your device. Open file reads it back in.</p>
-    <p class="subhead dl">Save to device</p>
-    <div class="row dl">
-      <button class="key on" id="bSaveMap" type="button">This map (.json)</button>
-      <button class="key" id="bSaveAll" type="button">All maps (.json)</button>
-      <button class="key" id="bSaveMd" type="button">Outline (.md)</button>
-    </div>
+    <p>Your maps save automatically in this browser. To keep a file on your device, use Save as in the top bar. Here you can bring a map back in from a file or pasted text, or copy one out as text.</p>
     <p class="subhead">Copy or paste</p>
     <div class="row">
       <button class="key" id="bCopyJson" type="button">Copy JSON</button>
@@ -461,7 +455,7 @@ body.diving #grid { opacity: .25; }
       <dt>Shift + T</dt><dd>Arrange fresh. Both work around the selected idea, or the whole map when nothing is selected</dd>
       <dt>F · A · M</dt><dd>Fit to screen · Auto-arrange · Maps</dd>
       <dt>Ctrl/⌘ Z · Shift Z</dt><dd>Undo · Redo</dd>
-      <dt>Ctrl/⌘ S</dt><dd>Save this map as a file on your device. Export ▾ also saves it as an image</dd>
+      <dt>Ctrl/⌘ S</dt><dd>Open Save as. Pick a format with ↑ ↓ and press Enter; your last choice is highlighted, so ⌘S then Enter repeats it</dd>
     </dl>
     <p class="subhead">Mouse &amp; touch</p>
     <dl class="shortcuts">
@@ -578,7 +572,7 @@ body.diving #grid { opacity: .25; }
     store.auto = auto;
     try { localStorage.setItem(KEY, JSON.stringify(store)); storageOK = true; } catch (e) { storageOK = false; }
     setSave(storageOK ? 'Saved' : 'Not saved: browser storage is off. Copy from the Logbook to keep it.', !storageOK);
-    $('#mapName').textContent = m.name;
+    $('#mapName').textContent = mapLabel(store.current);
   }
   function scheduleSave() { clearTimeout(saveT); setSave('Saving…'); saveT = setTimeout(persistNow, 350); }
   function setSave(t, warn) { const el = $('#saveTxt'); el.textContent = warn ? 'Not saved' : t; el.title = t; el.classList.toggle('warn', !!warn); }
@@ -615,6 +609,7 @@ body.diving #grid { opacity: .25; }
     const v = { el, txt, fold, x: p ? p.x : n.x, y: p ? p.y : n.y, w: 0, h: 0, px: NaN, py: NaN };
     txt.addEventListener('keydown', e => {
       if (editing !== id) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') return;   // let Save as handle it
       e.stopPropagation();
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); commitEdit(); }
       else if (e.key === 'Escape') { e.preventDefault(); commitEdit(true); }
@@ -976,6 +971,7 @@ body.diving #grid { opacity: .25; }
     const txt = document.createElement('span'); txt.className = 'ltxt'; label.appendChild(txt); world.appendChild(label);
     txt.addEventListener('keydown', e => {
       if (labelEditing !== lid) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') return;
       e.stopPropagation();
       if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); commitLabel(); }
       else if (e.key === 'Escape') { e.preventDefault(); commitLabel(true); }
@@ -1509,13 +1505,28 @@ body.diving #grid { opacity: .25; }
 
   addEventListener('keydown', e => {
     const tgt = e.target;
+    // Ctrl/Cmd+S opens Save as (even while typing), never the browser's own save dialog
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      if (document.querySelector('.modal:not([hidden])') || $('#bExport').hidden) return;
+      if (editing) commitEdit();
+      if (labelEditing) commitLabel();
+      if ($('#exportMenu').hidden) openExportMenu();
+      return;
+    }
     if (tgt.closest && tgt.closest('input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]')) return;
     const openModal = document.querySelector('.modal:not([hidden])');
     if (openModal) { if (e.key === 'Escape') closeModals(); return; }
+    const menu = ['#exportMenu', '#tidyMenu'].map(q => $(q)).find(m => !m.hidden);
+    if (menu && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault();
+      const items = [...menu.querySelectorAll('.tm')]; let i = items.indexOf(document.activeElement);
+      i = e.key === 'ArrowDown' ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
+      items[i].focus(); return;
+    }
     const k = e.key, mod = e.metaKey || e.ctrlKey;
     if (mod && k.toLowerCase() === 'z') { e.preventDefault(); return e.shiftKey ? doRedo() : doUndo(); }
     if (mod && k.toLowerCase() === 'y') { e.preventDefault(); return doRedo(); }
-    if (mod && k.toLowerCase() === 's') { e.preventDefault(); if (!$('#bSave').hidden) saveCurrent(); return; }
     if (mod || e.altKey) return;
     const onControl = tgt.closest && tgt.closest('button, a, label, select');
     if (onControl && (k === 'Tab' || k === 'Enter' || k === ' ')) return;
@@ -1702,10 +1713,10 @@ body.diving #grid { opacity: .25; }
     for (const id of ids) {
       const m = store.maps[id], li = document.createElement('li'); li.className = 'mapitem';
       const b = document.createElement('button'); b.type = 'button'; b.className = 'mapbtn' + (id === store.current ? ' cur' : '');
-      const st = document.createElement('strong'); st.textContent = m.name || 'Untitled map';
+      const st = document.createElement('strong'); st.textContent = mapLabel(id);
       const sm = document.createElement('small');
       const cnt = m.data && m.data.nodes ? Object.keys(m.data.nodes).length : 0;
-      sm.textContent = `${cnt} ideas · ${new Date(m.updated || Date.now()).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+      sm.textContent = `${cnt} ${cnt === 1 ? 'idea' : 'ideas'} · ${new Date(m.updated || Date.now()).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
       b.append(st, sm); b.addEventListener('click', () => { openMap(id); closeDrawer(); });
       li.appendChild(b);
       if (confirmDel === id) {
@@ -1737,13 +1748,13 @@ body.diving #grid { opacity: .25; }
     clearViews(); undo = []; redo = []; sel = null;
     freshSpawn = true; sync({ tidy: !!opts.tidy }); fit(true);
     for (const k in views) { views[k].x = N(k).x; views[k].y = N(k).y; }
-    $('#mapName').textContent = store.maps[id].name || '';
+    $('#mapName').textContent = mapLabel(id);
     persistNow();
   }
   function newMap() {
     if (editing) commitEdit();
     persistNow();
-    const id = uid(); store.maps[id] = { name: 'Central idea', updated: Date.now(), data: makeDoc('Central idea') };
+    const id = uid(); store.maps[id] = { name: 'Central idea', created: Date.now(), updated: Date.now(), data: makeDoc('Central idea') };
     openMap(id); closeDrawer();
     sel = doc.root; refreshSel(); startEdit(doc.root);
     toast('New map. Name your center, then press Tab to branch out.');
@@ -1754,7 +1765,7 @@ body.diving #grid { opacity: .25; }
     if (id === store.current) {
       store.current = null;
       const rest = Object.keys(store.maps).sort((a, b) => (store.maps[b].updated || 0) - (store.maps[a].updated || 0));
-      if (rest.length) openMap(rest[0]); else { const nid = uid(); store.maps[nid] = { name: 'Central idea', updated: Date.now(), data: makeDoc('Central idea') }; openMap(nid); }
+      if (rest.length) openMap(rest[0]); else { const nid = uid(); store.maps[nid] = { name: 'Central idea', created: Date.now(), updated: Date.now(), data: makeDoc('Central idea') }; openMap(nid); }
     }
     persistNow(); renderDrawer(); toast(`Deleted “${name}”`);
   }
@@ -1808,7 +1819,7 @@ body.diving #grid { opacity: .25; }
     for (const m of list) {
       const d = m && cleanDoc(m.map || m.data || m); if (!d) continue;
       fixTop(d);
-      const id = uid(); store.maps[id] = { name: plain(d.nodes[d.root].text) || 'Imported map', updated: Date.now() - n, data: d };
+      const id = uid(); store.maps[id] = { name: plain(d.nodes[d.root].text) || 'Imported map', created: Date.now() + n, updated: Date.now() - n, data: d };
       first = first || id; n++;
     }
     if (!n) return toast('No Mindsea maps found in that backup');
@@ -1824,8 +1835,17 @@ body.diving #grid { opacity: .25; }
     Promise.resolve(window.claude.use('downloads')).then(d => { dl = d; dlReady = true; if (!d) hideSave(); }).catch(() => { dlReady = true; hideSave(); });
   }
   const slug = t => (plain(t).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'map');
-  const stamp = () => { const d = new Date(), z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; };
+  const stamp = () => { const d = new Date(), z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`; };
+  const usedNames = new Set();
+  function uniqueName(filename) {
+    const dot = filename.lastIndexOf('.'), base = filename.slice(0, dot), ext = filename.slice(dot);
+    let name = filename, n = 2;
+    while (usedNames.has(name)) name = `${base}-${n++}${ext}`;
+    usedNames.add(name); return name;
+  }
+  const fileBase = () => `mindsea-${slug(mapLabel(store.current) || N(doc.root).text)}`;
   async function saveFile(filename, data) {
+    filename = uniqueName(filename);
     if (editing) commitEdit();
     if (labelEditing) commitLabel();
     persistNow();
@@ -1846,16 +1866,28 @@ body.diving #grid { opacity: .25; }
     }
     toast(dlReady ? 'Saving files is not available here. Use Copy JSON in the Logbook instead.' : 'Still getting ready. Try again in a second.');
   }
+  // Maps can share a name; the newer ones show (2), (3)… so they can be told apart.
+  function mapLabels() {
+    const ids = Object.keys(store.maps).sort((a, b) => (store.maps[a].created || 0) - (store.maps[b].created || 0));
+    const seen = {}, out = {};
+    for (const id of ids) {
+      const nm = store.maps[id].name || 'Untitled map', key = nm.trim().toLowerCase();
+      seen[key] = (seen[key] || 0) + 1;
+      out[id] = seen[key] > 1 ? `${nm} (${seen[key]})` : nm;
+    }
+    return out;
+  }
+  const mapLabel = id => (store.maps[id] ? mapLabels()[id] : '') || '';
   function saveCurrent() {
     const name = plain(N(doc.root).text) || 'Untitled map';
-    saveFile(`mindsea-${slug(name)}-${stamp()}.json`, JSON.stringify({ app: 'mindsea', version: 1, name, saved: new Date().toISOString(), map: doc }, null, 2));
+    saveFile(`${fileBase()}-${stamp()}.json`, JSON.stringify({ app: 'mindsea', version: 1, name, saved: new Date().toISOString(), map: doc }, null, 2));
   }
   function saveAll() {
     persistNow();
     const maps = Object.values(store.maps).sort((a, b) => (b.updated || 0) - (a.updated || 0)).map(m => ({ name: m.name, map: m.data }));
     saveFile(`mindsea-all-maps-${stamp()}.json`, JSON.stringify({ app: 'mindsea', version: 1, saved: new Date().toISOString(), maps }, null, 2));
   }
-  function saveOutline() { saveFile(`mindsea-${slug(N(doc.root).text)}-${stamp()}.md`, fullOutline()); }
+  function saveOutline() { saveFile(`${fileBase()}-${stamp()}.md`, fullOutline()); }
 
   /* ---------- export as image ---------- */
   const hexRgb = h => { const m = /^#?([0-9a-f]{6})$/i.exec(h || ''); const v = m ? parseInt(m[1], 16) : 0xff5c97; return [v >> 16 & 255, v >> 8 & 255, v & 255]; };
@@ -1963,7 +1995,7 @@ body.diving #grid { opacity: .25; }
     }
     cv.toBlob(blob => {
       if (!blob) return toast('Could not draw the image. Try folding some branches first.');
-      saveFile(`mindsea-${slug(N(doc.root).text)}-${stamp()}.png`, blob);
+      saveFile(`${fileBase()}-${stamp()}.png`, blob);
     }, 'image/png');
   }
   function openExportMenu() {
@@ -1972,7 +2004,7 @@ body.diving #grid { opacity: .25; }
     m.hidden = false; $('#bExport').classList.add('on'); $('#bExport').setAttribute('aria-expanded', 'true');
     m.style.top = (r.bottom + 8) + 'px';
     m.style.left = clamp(r.right - m.offsetWidth, 16, innerWidth - m.offsetWidth - 16) + 'px';
-    const f = m.querySelector('.tm'); if (f) f.focus();
+    const f = m.querySelector(`.tm[data-x="${store.lastSave || 'png'}"]`) || m.querySelector('.tm'); if (f) f.focus();
   }
   function closeExportMenu() {
     if ($('#exportMenu').hidden) return;
@@ -1982,12 +2014,9 @@ body.diving #grid { opacity: .25; }
   document.addEventListener('pointerdown', e => { if (!$('#exportMenu').hidden && !e.target.closest('#exportMenu, #bExport')) closeExportMenu(); }, true);
   document.querySelectorAll('#exportMenu .tm').forEach(b => b.addEventListener('click', () => {
     const x = b.dataset.x; closeExportMenu();
-    if (x === 'png') exportPNG(); else if (x === 'md') saveOutline(); else saveCurrent();
+    if (store.lastSave !== x) { store.lastSave = x; persistNow(); }
+    if (x === 'png') exportPNG(); else if (x === 'md') saveOutline(); else if (x === 'all') saveAll(); else saveCurrent();
   }));
-  $('#bSave').addEventListener('click', saveCurrent);
-  $('#bSaveMap').addEventListener('click', saveCurrent);
-  $('#bSaveAll').addEventListener('click', saveAll);
-  $('#bSaveMd').addEventListener('click', saveOutline);
 
   function importText(text) {
     let d = null, layout = false;
@@ -1999,7 +2028,7 @@ body.diving #grid { opacity: .25; }
       if (!d) return toast('That JSON is not a Mindsea map. Check that it has "root" and "nodes".');
     } else { d = parseOutline(tt); layout = true; if (!d) return toast('No ideas found in that text'); }
     fixTop(d);
-    const id = uid(); store.maps[id] = { name: plain(d.nodes[d.root].text) || 'Imported map', updated: Date.now(), data: d };
+    const id = uid(); store.maps[id] = { name: plain(d.nodes[d.root].text) || 'Imported map', created: Date.now(), updated: Date.now(), data: d };
     openMap(id, { tidy: layout });
     closeModals(); toast(`Opened “${store.maps[id].name}” with ${Object.keys(d.nodes).length} ideas`);
   }
@@ -2035,7 +2064,7 @@ body.diving #grid { opacity: .25; }
   freshSpawn = true; sync({ tidy: firstVisit, nosave: !firstVisit }); fit(true);
   renderYours();
   for (const k in views) { views[k].x = N(k).x; views[k].y = N(k).y; }
-  $('#mapName').textContent = store.maps[startId].name || '';
+  $('#mapName').textContent = mapLabel(startId);
   if (firstVisit) persistNow(); else setSave('Saved');
   if (!storageOK) setSave('Not saved: browser storage is off. Copy from the Logbook to keep it.', true);
   if (!reduce) { const goal = Object.assign({}, cam); cam.s *= .7; cam.x = innerWidth / 2 - (innerWidth / 2 - goal.x) * .7; cam.y = innerHeight / 2 - (innerHeight / 2 - goal.y) * .7; camGoal = goal; }
