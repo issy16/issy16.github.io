@@ -81,7 +81,7 @@ body.panning #stage { cursor: grabbing; }
 .node.root {
   font-family: var(--label); font-size: 20px; letter-spacing: .04em; line-height: 1.2;
   padding: 14px 20px; max-width: 300px; text-align: center;
-  background: var(--c); color: var(--on-pink);
+  background: var(--c); color: var(--on, var(--on-pink));
   border-color: color-mix(in srgb, var(--c) 55%, #fff);
   box-shadow: 4px 4px 0 color-mix(in srgb, var(--c) 38%, #000), 0 0 56px color-mix(in srgb, var(--c) 42%, transparent);
 }
@@ -193,6 +193,15 @@ body.dragging, body.dragging .node { cursor: grabbing; }
 }
 .sw.on { outline: 2px solid var(--ink); outline-offset: 2px; }
 .sw:disabled { opacity: .3; cursor: not-allowed; }
+.colormenu { position: fixed; z-index: 35; left: 0; top: 0; width: min(292px, calc(100% - 32px)); padding: 10px 12px 12px; display: grid; gap: 10px; background: var(--panel); box-shadow: 5px 5px 0 rgba(255, 92, 151, .28); }
+.colormenu .panel-label span:last-child { text-transform: none; font-family: var(--mono); letter-spacing: 0; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cgrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.cgrid .sw { width: 100%; height: 30px; }
+.cgrid:empty { display: none; }
+.colormenu .subhead { margin: 0; }
+.colormenu .row { align-items: center; }
+.pick { position: relative; overflow: hidden; }
+.pick input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
 
 /* ---------- status (top bar) ---------- */
 .status { font-family: var(--label); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; display: flex; gap: 10px; }
@@ -350,6 +359,7 @@ body.diving #grid { opacity: .25; }
     <button class="key" id="bFoldAll" type="button">Fold all <kbd>⇧U</kbd></button>
     <span class="sep"></span>
     <div class="swatches" id="swatches" role="group" aria-label="Branch color"></div>
+    <button class="key" id="bColors" type="button" aria-haspopup="dialog" aria-expanded="false">More <kbd>C</kbd></button>
     <span class="sep"></span>
     <button class="key" id="bUndo" type="button" aria-label="Undo">Undo</button>
     <button class="key" id="bRedo" type="button" aria-label="Redo">Redo</button>
@@ -378,6 +388,17 @@ body.diving #grid { opacity: .25; }
   <button class="tm" type="button" role="menuitem" data-mode="cleanup"><b>Clean up <kbd>T</kbd></b><small>Snap to the grid and fix overlaps. Keeps your layout.</small></button>
   <button class="tm" type="button" role="menuitem" data-mode="arrange"><b>Arrange <kbd>Shift T</kbd></b><small>Lay it out fresh, branches fanning in a gentle curve.</small></button>
   <button class="tm" type="button" role="menuitem" data-mode="sort"><b>Sort A–Z</b><small>Order each branch by name, then arrange.</small></button>
+</div>
+
+<div class="colormenu panel" id="colorMenu" hidden role="dialog" aria-label="Colors">
+  <div class="panel-label"><span class="hot">Color</span><span id="colorScope"></span></div>
+  <div class="cgrid" id="colorGrid" role="group" aria-label="Sea colors"></div>
+  <p class="subhead" id="yoursHead" hidden>Your colors</p>
+  <div class="cgrid" id="colorYours" role="group" aria-label="Your colors"></div>
+  <div class="row">
+    <label class="key pick" for="colorPick">Custom… <input type="color" id="colorPick" value="#ff5c97"></label>
+    <button class="key" id="bInherit" type="button">Match parent</button>
+  </div>
 </div>
 
 <aside class="drawer panel" id="drawer" hidden aria-label="Your maps">
@@ -430,7 +451,7 @@ body.diving #grid { opacity: .25; }
       <dt>Shift + Enter</dt><dd>New line while typing</dd>
       <dt>Del / Backspace</dt><dd>Delete the idea and its branches</dd>
       <dt>Arrow keys</dt><dd>Move between ideas</dd>
-      <dt>1 – 6</dt><dd>Color the branch</dd>
+      <dt>1 – 6 · C</dt><dd>Quick colors · Open all colors, including your own</dd>
       <dt>U · Shift + U</dt><dd>Unfold everything · Fold every main branch</dd>
       <dt>D</dt><dd>Dive: focus one thought and let the rest fade</dd>
       <dt>T</dt><dd>Clean up: snap to the grid and fix overlaps, keeping your layout</dd>
@@ -459,6 +480,13 @@ body.diving #grid { opacity: .25; }
 (() => {
   const $ = s => document.querySelector(s);
   const PALETTE = [['Pink', '#ff5c97'], ['Coral', '#ff9b6e'], ['Kelp', '#7fe3a4'], ['Sea', '#53d8ea'], ['Jelly', '#ab8dff'], ['Pearl', '#e6e3f0']];
+  // the full sea palette, ordered by hue (the first six quick colors are in here too)
+  const SEA_COLORS = [
+    ['Ember', '#ff6b5c'], ['Coral', '#ff9b6e'], ['Amber', '#ffc457'], ['Sunfish', '#f2e46b'], ['Moss', '#b8dc6a'], ['Kelp', '#7fe3a4'],
+    ['Lagoon', '#3fcfb0'], ['Sea glass', '#7ff0dc'], ['Sea', '#53d8ea'], ['Tide', '#5aa9ff'], ['Deep', '#7f8cff'], ['Jelly', '#ab8dff'],
+    ['Lilac', '#cdb8ff'], ['Orchid', '#e08cff'], ['Pink', '#ff5c97'], ['Shell', '#ffa8c5'], ['Sand', '#e3c9a0'], ['Pearl', '#e6e3f0'],
+  ];
+  const lum = hex => { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return 1; const v = parseInt(m[1], 16); const f = x => { x /= 255; return x <= .03928 ? x / 12.92 : Math.pow((x + .055) / 1.055, 2.4); }; return .2126 * f(v >> 16 & 255) + .7152 * f(v >> 8 & 255) + .0722 * f(v & 255); };
   const KEY = 'mindsea:v1';
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const HG = 54, HG_ROOT = 78, VG = 12, VG_ROOT = 24, MAXDEPTH = 600;
@@ -636,6 +664,7 @@ body.diving #grid { opacity: .25; }
       const dim = !!diving && !focusSet.has(id);
       v.el.hidden = !shown;
       v.el.style.setProperty('--c', c);
+      v.el.style.setProperty('--on', lum(c) > .3 ? '#1c0712' : '#f4f6ff');
       v.el.classList.toggle('root', id === doc.root);
       v.el.classList.toggle('l1', lv === 1);
       v.el.classList.toggle('free', !n.parent && id !== doc.root);
@@ -1491,10 +1520,11 @@ body.diving #grid { opacity: .25; }
       case 'Enter': e.preventDefault(); addSibling(sel); break;
       case 'Delete': case 'Backspace': if (selLink) { e.preventDefault(); removeLink(selLink); } else if (sel) { e.preventDefault(); removeNode(sel); } break;
       case 'F2': case ' ': e.preventDefault(); if (selLink) editLabel(selLink); else startEdit(sel || doc.root); break;
-      case 'Escape': if (!$('#tidyMenu').hidden) closeTidyMenu(); else if (linkFrom) { endLinking(); toast('Linking cancelled'); } else if (boxMode) setBoxMode(false); else if (!$('#drawer').hidden) closeDrawer(); else if (diving) toggleDive(false); else select(null); break;
+      case 'Escape': if (!$('#colorMenu').hidden) closeColorMenu(); else if (!$('#tidyMenu').hidden) closeTidyMenu(); else if (linkFrom) { endLinking(); toast('Linking cancelled'); } else if (boxMode) setBoxMode(false); else if (!$('#drawer').hidden) closeDrawer(); else if (diving) toggleDive(false); else select(null); break;
       case 'ArrowUp': case 'ArrowDown': case 'ArrowLeft': case 'ArrowRight': e.preventDefault(); nav(k); break;
       case 'l': case 'L': startLinking(sel); break;
       case 's': case 'S': setBoxMode(!boxMode); break;
+      case 'c': case 'C': $('#colorMenu').hidden ? openColorMenu() : closeColorMenu(); break;
       case 'u': case 'U': if (e.shiftKey) foldAll(); else unfoldAll(); break;
       case 'n': case 'N': addFreeCenter(); break;
       case 'd': case 'D': toggleDive(); break;
@@ -1522,6 +1552,8 @@ body.diving #grid { opacity: .25; }
     if (msel.size > 1) $('#dockName').textContent = `${msel.size} ideas selected · + Parent groups them`;
     $('#bUndo').disabled = !undo.length; $('#bRedo').disabled = !redo.length;
     const c = has ? colorOf(sel) : null;
+    $('#bColors').disabled = !has;
+    if (!has) closeColorMenu();
     document.querySelectorAll('.sw').forEach(b => { b.disabled = !has; b.classList.toggle('on', b.dataset.c === c); b.setAttribute('aria-pressed', String(b.dataset.c === c)); });
   }
   function updateCount() {
@@ -1569,11 +1601,60 @@ body.diving #grid { opacity: .25; }
   let toastT;
   function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
 
-  PALETTE.forEach(([name, c], i) => {
+  function makeSwatch(name, c, box) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'sw'; b.dataset.c = c;
-    b.style.setProperty('--c', c); b.title = `${name} (${i + 1})`; b.setAttribute('aria-label', name);
-    b.addEventListener('click', () => setColor(sel, c));
-    $('#swatches').appendChild(b);
+    b.style.setProperty('--c', c); b.title = name; b.setAttribute('aria-label', name);
+    b.addEventListener('click', () => { if (sel) setColor(sel, c); });
+    box.appendChild(b); return b;
+  }
+  PALETTE.forEach(([name, c], i) => makeSwatch(`${name} (${i + 1})`, c, $('#swatches')));
+  SEA_COLORS.forEach(([name, c]) => makeSwatch(name, c, $('#colorGrid')));
+  function renderYours() {
+    const box = $('#colorYours'); box.textContent = '';
+    const list = Array.isArray(store.custom) ? store.custom : [];
+    list.forEach(c => makeSwatch('Your color ' + c, c, box));
+    $('#yoursHead').hidden = !list.length;
+    updateDock(); placeColorMenu();
+  }
+  function openColorMenu() {
+    if (!sel || !doc.nodes[sel]) return toast('Select an idea first, then pick its color');
+    if (editing) commitEdit();
+    closeTidyMenu();
+    const m = $('#colorMenu'), r = $('#bColors').getBoundingClientRect();
+    $('#colorScope').textContent = msel.size > 1 ? `for ${msel.size} ideas` : `for “${plain(N(sel).text) || 'untitled'}”`;
+    $('#bInherit').disabled = !N(sel).color;
+    $('#colorPick').value = /^#[0-9a-f]{6}$/i.test(colorOf(sel)) ? colorOf(sel) : '#ff5c97';
+    m.hidden = false; $('#bColors').classList.add('on'); $('#bColors').setAttribute('aria-expanded', 'true');
+    m.dataset.cx = r.left + r.width / 2;
+    placeColorMenu();
+  }
+  function placeColorMenu() {
+    const m = $('#colorMenu'); if (m.hidden) return;
+    m.style.left = clamp(+m.dataset.cx - m.offsetWidth / 2, 16, innerWidth - m.offsetWidth - 16) + 'px';
+    m.style.top = Math.max(16, $('.dock').getBoundingClientRect().top - m.offsetHeight - 12) + 'px';
+  }
+  function closeColorMenu() {
+    if ($('#colorMenu').hidden) return;
+    $('#colorMenu').hidden = true; $('#bColors').classList.remove('on'); $('#bColors').setAttribute('aria-expanded', 'false');
+  }
+  $('#bColors').addEventListener('click', e => { e.stopPropagation(); $('#colorMenu').hidden ? openColorMenu() : closeColorMenu(); });
+  document.addEventListener('pointerdown', e => { if (!$('#colorMenu').hidden && !e.target.closest('#colorMenu, #bColors, #swatches')) closeColorMenu(); }, true);
+  $('#colorPick').addEventListener('change', e => {
+    const c = String(e.target.value || '').toLowerCase(); if (!/^#[0-9a-f]{6}$/.test(c) || !sel) return;
+    setColor(sel, c);
+    if (!SEA_COLORS.some(([, x]) => x === c)) {
+      store.custom = [c, ...(Array.isArray(store.custom) ? store.custom : []).filter(x => x !== c)].slice(0, 12);
+      renderYours(); persistNow();
+    }
+    $('#bInherit').disabled = false;
+  });
+  $('#bInherit').addEventListener('click', () => {
+    if (!sel) return;
+    const ids = (msel.size > 1 ? [...msel] : [sel]).filter(k => doc.nodes[k] && N(k).color);
+    if (!ids.length) return;
+    snap(); ids.forEach(k => { delete N(k).color; }); sync();
+    $('#bInherit').disabled = true;
+    toast(ids.length > 1 ? `${ids.length} ideas now follow their branch color` : 'Now follows its branch color');
   });
 
   $('#bChild').addEventListener('click', () => addChild(sel || doc.root));
@@ -1820,6 +1901,7 @@ body.diving #grid { opacity: .25; }
   store.current = startId;
   doc = JSON.parse(JSON.stringify(store.maps[startId].data));
   freshSpawn = true; sync({ tidy: firstVisit, nosave: !firstVisit }); fit(true);
+  renderYours();
   for (const k in views) { views[k].x = N(k).x; views[k].y = N(k).y; }
   $('#mapName').textContent = store.maps[startId].name || '';
   if (firstVisit) persistNow(); else setSave('Saved');
