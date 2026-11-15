@@ -50,6 +50,7 @@ button { font: inherit; color: inherit; }
 
 /* ---------- the sea ---------- */
 #seaCanvas, #grid, #stage { position: fixed; inset: 0; }
+#seaCanvas { image-rendering: pixelated; }
 #grid {
   pointer-events: none;
   background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
@@ -75,7 +76,6 @@ body.panning #stage { cursor: grabbing; }
   white-space: pre-wrap; overflow-wrap: anywhere;
   cursor: grab; user-select: none; -webkit-user-select: none;
   transition: opacity .35s, filter .35s, box-shadow .15s steps(2), border-color .15s steps(2);
-  will-change: transform;
 }
 .node.l1 { font-family: var(--mono); font-weight: 600; font-size: 15px; padding: 8px 14px; }
 .node.root {
@@ -163,7 +163,6 @@ body.dragging, body.dragging .node { cursor: grabbing; }
   position: fixed; top: 0; left: 0; right: 0; z-index: 20;
   padding-top: env(safe-area-inset-top, 0px);
   background: rgba(8, 13, 26, .82); border-bottom: 1.5px solid var(--line);
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 }
 .topbar-inner {
   display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap;
@@ -180,7 +179,7 @@ body.dragging, body.dragging .node { cursor: grabbing; }
   bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   width: max-content; max-width: calc(100% - 32px);
   padding: 8px 10px 10px; display: grid; gap: 7px;
-  background: rgba(13, 21, 40, .9); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  background: rgba(13, 21, 40, .96);
   box-shadow: 4px 4px 0 rgba(255, 92, 151, .22);
 }
 .dock .panel-label span:last-child { max-width: 46ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; font-family: var(--mono); letter-spacing: 0; }
@@ -690,6 +689,7 @@ body.diving #grid { opacity: .25; }
   }
 
   function refreshSel() {
+    seaDirty = true;
     normSel();
     for (const id in views) views[id].el.classList.toggle('sel', msel.has(id));
     if (doc) syncLinks(visibleSet());
@@ -1146,7 +1146,11 @@ body.diving #grid { opacity: .25; }
   }
 
   /* ---------- camera ---------- */
+  let camKey = '';
   function applyCam() {
+    const key = cam.x.toFixed(2) + ',' + cam.y.toFixed(2) + ',' + cam.s.toFixed(4);
+    if (key === camKey) return;
+    camKey = key; seaDirty = true;
     world.style.transform = `translate(${cam.x}px,${cam.y}px) scale(${cam.s})`;
     const g = 32 * cam.s * (cam.s < .5 ? 2 : 1);
     gridEl.style.backgroundSize = `${g}px ${g}px`;
@@ -1201,11 +1205,48 @@ body.diving #grid { opacity: .25; }
 
   /* ---------- the sea (canvas) ---------- */
   let W = 0, Hh = 0, dpr = 1, parts = [], bubbles = [];
+  // The sea is a soft backdrop, so it renders at 1x (pixelated) and redraws at ~30 fps;
+  // the gradient, light rays and vignette are cached and only repainted when the depth changes.
+  const SEA_FPS_MS = 33;
+  let seaDirty = true, lastSea = 0, bgK = -1, bgDive = null;
+  const bgCanvas = document.createElement('canvas'), bgCtx = bgCanvas.getContext('2d');
+  const vgCanvas = document.createElement('canvas'), vgCtx = vgCanvas.getContext('2d');
+  const makeGlow = rgb => {
+    const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+    const rg = g.createRadialGradient(32, 32, 0, 32, 32, 32); rg.addColorStop(0, `rgba(${rgb},1)`); rg.addColorStop(1, `rgba(${rgb},0)`);
+    g.fillStyle = rg; g.fillRect(0, 0, 64, 64); return c;
+  };
+  const glowSprites = { '255,92,151': makeGlow('255,92,151'), '83,216,234': makeGlow('83,216,234') };
+  function paintBackdrop(k) {
+    bgCanvas.width = vgCanvas.width = W; bgCanvas.height = vgCanvas.height = Hh;
+    const g = bgCtx.createLinearGradient(0, 0, 0, Hh);
+    g.addColorStop(0, mix([19, 50, 94], [6, 10, 26], k));
+    g.addColorStop(.55, mix([8, 23, 50], [3, 6, 16], k));
+    g.addColorStop(1, mix([4, 10, 26], [1, 2, 7], k));
+    bgCtx.fillStyle = g; bgCtx.fillRect(0, 0, W, Hh);
+    const ray = Math.max(0, 1 - k * 2.4);
+    if (ray > 0) {
+      bgCtx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 5; i++) {
+        const x0 = W * (.08 + i * .2) + Math.sin(i * 1.7) * 50;
+        const rg = bgCtx.createLinearGradient(0, 0, 0, Hh * .85);
+        rg.addColorStop(0, `rgba(140,200,255,${.075 * ray})`); rg.addColorStop(1, 'rgba(140,200,255,0)');
+        bgCtx.fillStyle = rg; bgCtx.beginPath();
+        bgCtx.moveTo(x0 - 26, 0); bgCtx.lineTo(x0 + 34, 0); bgCtx.lineTo(x0 + 170 + i * 18, Hh * .85); bgCtx.lineTo(x0 + 60, Hh * .85);
+        bgCtx.closePath(); bgCtx.fill();
+      }
+      bgCtx.globalCompositeOperation = 'source-over';
+    }
+    const vg = vgCtx.createRadialGradient(W / 2, Hh / 2, Math.min(W, Hh) * (.3 - (diving ? .12 : 0)), W / 2, Hh / 2, Math.max(W, Hh) * .75);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(0,1,4,${.35 + .4 * k + (diving ? .2 : 0)})`);
+    vgCtx.fillStyle = vg; vgCtx.fillRect(0, 0, W, Hh);
+    bgK = k; bgDive = !!diving;
+  }
   function resize() {
-    dpr = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; Hh = innerHeight;
+    dpr = 1; W = innerWidth; Hh = innerHeight; bgK = -1; seaDirty = true;
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(Hh * dpr);
     canvas.style.width = W + 'px'; canvas.style.height = Hh + 'px';
-    const n = Math.min(260, Math.round(W * Hh / 8000)); parts = [];
+    const n = Math.min(170, Math.round(W * Hh / 11000)); parts = [];
     for (let i = 0; i < n; i++) {
       const glow = Math.random() < .12;
       parts.push({ x: Math.random() * W, y: Math.random() * Hh, z: .2 + Math.random() * .8, v: 4 + Math.random() * 14, w: .3 + Math.random() * .7, ph: Math.random() * 6.28, glow,
@@ -1231,29 +1272,17 @@ body.diving #grid { opacity: .25; }
 
   let lastDepthTxt = '';
   function drawSea(now) {
+    // with reduced motion, nothing drifts: only redraw when something changed
+    if (reduce ? !seaDirty : (now - lastSea < SEA_FPS_MS)) return;
+    lastSea = now; seaDirty = false;
     const t = reduce ? 0 : now / 1000;
-    depthShown += (targetDepth() - depthShown) * (reduce ? 1 : .035);
+    const target = targetDepth();
+    depthShown += (target - depthShown) * (reduce ? 1 : .07);
+    if (Math.abs(target - depthShown) > .5) seaDirty = true;
     const k = depthShown / MAXDEPTH;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const g = ctx.createLinearGradient(0, 0, 0, Hh);
-    g.addColorStop(0, mix([19, 50, 94], [6, 10, 26], k));
-    g.addColorStop(.55, mix([8, 23, 50], [3, 6, 16], k));
-    g.addColorStop(1, mix([4, 10, 26], [1, 2, 7], k));
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, Hh);
-
-    const ray = Math.max(0, 1 - k * 2.4);
-    if (ray > 0) {
-      ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      for (let i = 0; i < 5; i++) {
-        const x0 = W * (.08 + i * .2) + Math.sin(t * .18 + i * 1.7) * 50 + cam.x * .03;
-        const rg = ctx.createLinearGradient(0, 0, 0, Hh * .85);
-        rg.addColorStop(0, `rgba(140,200,255,${.075 * ray})`); rg.addColorStop(1, 'rgba(140,200,255,0)');
-        ctx.fillStyle = rg; ctx.beginPath();
-        ctx.moveTo(x0 - 26, 0); ctx.lineTo(x0 + 34, 0); ctx.lineTo(x0 + 170 + i * 18, Hh * .85); ctx.lineTo(x0 + 60, Hh * .85);
-        ctx.closePath(); ctx.fill();
-      }
-      ctx.restore();
-    }
+    if (Math.abs(k - bgK) > .004 || bgDive !== !!diving) paintBackdrop(k);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(bgCanvas, 0, 0);
 
     for (const p of parts) {
       const par = p.z * .12;
@@ -1262,9 +1291,7 @@ body.diving #grid { opacity: .25; }
       if (p.glow) {
         const pulse = .5 + .5 * Math.sin(t * 1.3 + p.ph);
         const a = (.12 + .55 * k) * (.35 + .65 * pulse), r = 4 + 12 * p.z;
-        const gg = ctx.createRadialGradient(x, y, 0, x, y, r);
-        gg.addColorStop(0, `rgba(${p.c},${a})`); gg.addColorStop(1, `rgba(${p.c},0)`);
-        ctx.fillStyle = gg; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+        ctx.globalAlpha = a; ctx.drawImage(glowSprites[p.c], x - r, y - r, r * 2, r * 2); ctx.globalAlpha = 1;
         ctx.fillStyle = `rgba(${p.c},${Math.min(1, a * 1.8)})`; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 2, 2);
       } else {
         const sz = p.s * (p.z > .75 ? 2 : 1);
@@ -1277,23 +1304,22 @@ body.diving #grid { opacity: .25; }
       ctx.lineWidth = 1.2;
       bubbles = bubbles.filter(b => b.life > 0 && b.y > -12);
       for (const b of bubbles) {
-        b.y -= b.vy; b.x += Math.sin(b.ph + b.y * .05) * .45; b.life -= .0055;
+        b.y -= b.vy * 2; b.x += Math.sin(b.ph + b.y * .05) * .9; b.life -= .011;
         ctx.strokeStyle = `rgba(190,235,255,${.55 * b.life})`;
         ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.283); ctx.stroke();
         ctx.fillStyle = `rgba(230,250,255,${.6 * b.life})`; ctx.fillRect(b.x - b.r * .45, b.y - b.r * .55, 1.5, 1.5);
       }
     }
 
-    const vg = ctx.createRadialGradient(W / 2, Hh / 2, Math.min(W, Hh) * (.3 - (diving ? .12 : 0)), W / 2, Hh / 2, Math.max(W, Hh) * .75);
-    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(0,1,4,${.35 + .4 * k + (diving ? .2 : 0)})`);
-    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, Hh);
+    ctx.drawImage(vgCanvas, 0, 0);
+    if (bubbles.length) seaDirty = true;
 
     const pos = (k * 100).toFixed(1) + '%';
     if (pos !== lastDepthTxt) { lastDepthTxt = pos; $('#gaugeMark').style.top = pos; }
   }
 
   /* ---------- main loop ---------- */
-  let dragActive = false;
+  let dragActive = false, nodesSettled = false;
   function frameBody(now) {
     if (camGoal) {
       const e = reduce ? 1 : .12;
@@ -1303,13 +1329,17 @@ body.diving #grid { opacity: .25; }
     applyCam();
     const ease = reduce || dragActive ? 1 : .2;
     let edgesDirty = dirty;
+    if (dirty || dragActive || !nodesSettled) {
+    let moving = false;
     for (const id in views) {
       const v = views[id]; if (v.el.hidden) continue;
       const n = doc.nodes[id]; if (!n) continue;
       const dx = n.x - v.x, dy = n.y - v.y;
-      if (Math.abs(dx) > .15 || Math.abs(dy) > .15) { v.x += dx * ease; v.y += dy * ease; } else { v.x = n.x; v.y = n.y; }
+      if (Math.abs(dx) > .15 || Math.abs(dy) > .15) { v.x += dx * ease; v.y += dy * ease; moving = true; } else { v.x = n.x; v.y = n.y; }
       const tx = Math.round((v.x - v.w / 2) * 10) / 10, ty = Math.round((v.y - v.h / 2) * 10) / 10;
       if (dirty || tx !== v.px || ty !== v.py) { v.el.style.transform = `translate(${tx}px,${ty}px)`; v.px = tx; v.py = ty; edgesDirty = true; }
+    }
+    nodesSettled = !moving && !dragActive;
     }
     if (edgesDirty) drawEdges();
     if (edgesDirty || linksDirty) { drawLinks(); linksDirty = false; }
