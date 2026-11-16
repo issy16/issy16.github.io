@@ -233,6 +233,29 @@ body.diving .topbar { opacity: 0; transform: translateY(-100%); pointer-events: 
 body.diving .dock { opacity: 0; transform: translate(-50%, 40px); pointer-events: none; }
 body.diving #grid { opacity: .25; }
 
+/* ---------- sync ---------- */
+#bSync[data-state]::before { content: ""; width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--muted); }
+#bSync[data-state="synced"]::before { background: #5fe3a0; box-shadow: 0 0 6px #5fe3a0; }
+#bSync[data-state="syncing"]::before { background: var(--sea); animation: blinkdot 1s steps(2) infinite; }
+#bSync[data-state="offline"]::before, #bSync[data-state="error"]::before { background: var(--pink); }
+@keyframes blinkdot { 50% { opacity: .25; } }
+.sstep { display: grid; gap: 10px; }
+.sstep form { display: grid; gap: 10px; }
+.sstep .row form, .sstep form.row { display: flex; }
+.mbox input[type="email"], .mbox input[type="password"] {
+  flex: 1; min-width: 0; width: 100%; padding: 8px 10px; font: 14px var(--mono);
+  background: var(--abyss); color: var(--ink); border: 1.5px solid var(--line); border-radius: 3px;
+}
+.mbox input[type="email"]:focus, .mbox input[type="password"]:focus { border-color: var(--pink-2); outline: none; }
+.mbox label.field { display: grid; gap: 4px; font-family: var(--label); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.mbox label.check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; color: var(--ink); line-height: 1.45; }
+.mbox label.check input { margin-top: 3px; accent-color: var(--pink); }
+.syncmsg { min-height: 1.2em; font-family: var(--mono); font-size: 13px; color: var(--sea) !important; }
+.syncmsg.warn { color: var(--pink-ink) !important; }
+.privacy { border-top: 1px dashed var(--line); padding-top: 10px; font-size: 12.5px !important; }
+.privacy b { color: var(--ink); font-weight: 500; }
+.linkish { background: none; border: 0; padding: 0; color: var(--pink-ink); font: 13px var(--body); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; justify-self: start; }
+
 /* ---------- tidy menu ---------- */
 .tidymenu { position: fixed; z-index: 35; left: 0; top: 0; width: min(300px, calc(100% - 32px)); padding: 10px; display: grid; gap: 6px; background: var(--panel); box-shadow: 5px 5px 0 rgba(255, 92, 151, .28); }
 .tidymenu .panel-label span:last-child { text-transform: none; font-family: var(--mono); letter-spacing: 0; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -297,6 +320,7 @@ body.diving #grid { opacity: .25; }
   .status { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
+  #bSync[data-state="syncing"]::before { animation: none; }
   .chrome, .node, .toast, .dive-hud { transition: none; }
   #links path.to { animation: none; }
 }
@@ -322,6 +346,7 @@ body.diving #grid { opacity: .25; }
   <div class="topbar-inner">
     <div class="brand"><span class="dots"><i></i><i></i><i></i></span><b>MINDSEA</b><span class="mapname" id="mapName"></span><span class="status" aria-live="polite"><span class="tstat" id="countTxt">0 ideas</span><span class="tstat" id="saveTxt">Saved</span></span></div>
     <nav class="menu" aria-label="Map controls">
+      <button class="key" id="bSync" type="button" title="Sync your maps across devices">Sign in</button>
       <button class="key" id="bMaps" type="button">Maps <kbd>M</kbd></button>
       <button class="key" id="bTidy" type="button" aria-haspopup="menu" aria-expanded="false">Tidy ▾</button>
       <button class="key" id="bFit" type="button">Fit <kbd>F</kbd></button>
@@ -432,6 +457,35 @@ body.diving #grid { opacity: .25; }
   </div>
 </div>
 
+<div class="modal" id="syncModal" hidden>
+  <div class="mbox panel" role="dialog" aria-modal="true" aria-labelledby="syncTitle">
+    <h2 id="syncTitle">Sync</h2>
+
+    <div class="sstep" data-step="off">
+      <p>Sign in to keep your maps in step across your browsers and devices.</p>
+      <div class="row"><button class="key on" id="bGoogle" type="button">Continue with Google</button></div>
+      <p class="subhead">Or get a sign-in link by email</p>
+      <form class="row" id="emailForm">
+        <input type="email" id="syncEmail" autocomplete="email" placeholder="you@example.com" required aria-label="Email address">
+        <button class="key" type="submit">Email me a link</button>
+      </form>
+    </div>
+
+    <div class="sstep" data-step="on" hidden>
+      <p id="syncWho"></p>
+      <div class="row">
+        <button class="key on" id="bSyncNow" type="button">Sync now</button>
+        <button class="key" id="bSignOut" type="button">Sign out</button>
+      </div>
+      <label class="check"><input type="checkbox" id="signOutClear"> When I sign out, also remove my maps from this browser (for shared computers).</label>
+    </div>
+
+    <p class="syncmsg" id="syncMsg" role="status" aria-live="polite"></p>
+    <p class="privacy"><b>Privacy.</b> Your maps are stored in Mindsea’s database, linked to the account you sign in with. Through the site, only you can see them. The site owner can technically see stored data, including your maps and your email address.</p>
+    <button class="key mclose" type="button" data-close>Close</button>
+  </div>
+</div>
+
 <div class="modal" id="helpModal" hidden>
   <div class="mbox panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
     <h2 id="helpTitle">Controls</h2>
@@ -454,6 +508,7 @@ body.diving #grid { opacity: .25; }
       <dt>Shift + T</dt><dd>Arrange fresh. Both work around the selected idea, or the whole map when nothing is selected</dd>
       <dt>F · A · M</dt><dd>Fit to screen · Auto-arrange · Maps</dd>
       <dt>Ctrl/⌘ Z · Shift Z</dt><dd>Undo · Redo</dd>
+      <dt>Sign in</dt><dd>Sync your maps across browsers and devices (website only)</dd>
       <dt>Ctrl/⌘ S</dt><dd>Open Save as. Pick a format with ↑ ↓ and press Enter; your last choice is highlighted, so ⌘S then Enter repeats it</dd>
     </dl>
     <p class="subhead">Mouse &amp; touch</p>
@@ -563,11 +618,19 @@ body.diving #grid { opacity: .25; }
     try { const raw = localStorage.getItem(KEY); if (raw) { const s = JSON.parse(raw); if (s && s.maps && typeof s.maps === 'object') store = Object.assign(store, s); } }
     catch (e) { storageOK = false; }
   }
-  function persistNow() {
-    clearTimeout(saveT);
-    if (!doc || !store.maps[store.current]) return;
-    const m = store.maps[store.current];
-    m.data = doc; m.name = plain(N(doc.root).text) || 'Untitled map'; m.updated = Date.now();
+  // the last saved JSON of each map, so that only real edits (not just opening or laying out) count as changes
+  const lastSaved = {};
+  function persistNow(opts = {}) {
+    clearTimeout(saveT); saveT = null;
+    if (!doc || !store.maps[store.current]) return writeStore();
+    const id = store.current, m = store.maps[id];
+    m.data = doc; m.name = plain(N(doc.root).text) || 'Untitled map';
+    const json = JSON.stringify(doc);
+    if (opts.baseline) lastSaved[id] = json;
+    else if (json !== lastSaved[id]) { lastSaved[id] = json; m.updated = Date.now(); delete m.sample; markDirty(id); }
+    writeStore();
+  }
+  function writeStore() {
     store.auto = auto;
     try { localStorage.setItem(KEY, JSON.stringify(store)); storageOK = true; } catch (e) { storageOK = false; }
     setSave(storageOK ? 'Saved' : 'Not saved: browser storage is off. Copy from the Logbook to keep it.', !storageOK);
@@ -1779,19 +1842,21 @@ body.diving #grid { opacity: .25; }
     freshSpawn = true; sync({ tidy: !!opts.tidy }); fit(true);
     for (const k in views) { views[k].x = N(k).x; views[k].y = N(k).y; }
     $('#mapName').textContent = mapLabel(id);
-    persistNow();
+    persistNow({ baseline: true });
   }
   function newMap() {
     if (editing) commitEdit();
     persistNow();
     const id = uid(); store.maps[id] = { name: 'Central idea', created: Date.now(), updated: Date.now(), data: makeDoc('Central idea') };
+    markDirty(id);
     openMap(id); closeDrawer();
     sel = doc.root; refreshSel(); startEdit(doc.root);
     toast('New map. Name your center, then press Tab to branch out.');
   }
   function deleteMap(id) {
     const name = store.maps[id] ? store.maps[id].name : 'map';
-    delete store.maps[id]; confirmDel = null;
+    delete store.maps[id]; delete lastSaved[id]; confirmDel = null;
+    store.tomb[id] = Date.now(); markDirty(id);
     if (id === store.current) {
       store.current = null;
       const rest = Object.keys(store.maps).sort((a, b) => (store.maps[b].updated || 0) - (store.maps[a].updated || 0));
@@ -1850,7 +1915,7 @@ body.diving #grid { opacity: .25; }
       const d = m && cleanDoc(m.map || m.data || m); if (!d) continue;
       fixTop(d);
       const id = uid(); store.maps[id] = { name: plain(d.nodes[d.root].text) || 'Imported map', created: Date.now() + n, updated: Date.now() - n, data: d };
-      first = first || id; n++;
+      markDirty(id, true); first = first || id; n++;
     }
     if (!n) return toast('No Mindsea maps found in that backup');
     openMap(first); closeModals();
@@ -2059,6 +2124,7 @@ body.diving #grid { opacity: .25; }
     } else { d = parseOutline(tt); layout = true; if (!d) return toast('No ideas found in that text'); }
     fixTop(d);
     const id = uid(); store.maps[id] = { name: plain(d.nodes[d.root].text) || 'Imported map', created: Date.now(), updated: Date.now(), data: d };
+    markDirty(id);
     openMap(id, { tidy: layout });
     closeModals(); toast(`Opened “${store.maps[id].name}” with ${Object.keys(d.nodes).length} ideas`);
   }
@@ -2077,14 +2143,222 @@ body.diving #grid { opacity: .25; }
     m.addEventListener('click', e => { if (e.target === m || e.target.closest('[data-close]')) closeModals(); });
   });
 
+  /* ---------- cloud sync (website only) ---------- */
+  const SB_URL = 'https://wrjmzbpbfstrxcveqked.supabase.co';
+  const SB_KEY = 'sb_publishable_asHonNuHGicSdvhYBITVJw_X2c8lc1X';   // public by design; the database rules do the protecting
+  const SB_LIB = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js';
+  const cloud = { sb: null, user: null, state: 'off', channel: null, pushing: false, again: false, pushT: null, lastPull: 0, starting: false };
+  const REDIRECT = () => location.origin + location.pathname;
+
+  function markDirty(id, quiet) {
+    store.syncDirty[id] = true;
+    if (quiet || !cloud.user) return;
+    clearTimeout(cloud.pushT); cloud.pushT = setTimeout(pushDirty, 1200);
+  }
+
+  const STATE_LABEL = { off: 'Sign in', syncing: 'Syncing…', synced: 'Synced', offline: 'Offline', error: 'Sync' };
+  function setCloud(state, detail) {
+    cloud.state = state;
+    const b = $('#bSync'); b.textContent = STATE_LABEL[state] || 'Sync'; b.dataset.state = state;
+    b.title = detail || { off: 'Sign in to sync your maps across devices', synced: 'Your maps are synced', syncing: 'Syncing your maps…', offline: 'Can’t reach the sync server. Your maps are safe in this browser and will sync when it’s back.' }[state] || '';
+    renderSyncPanel();
+  }
+  function syncMsg(text, warn) { const el = $('#syncMsg'); el.textContent = text || ''; el.classList.toggle('warn', !!warn); }
+  function renderSyncPanel() {
+    const step = cloud.user ? 'on' : 'off';
+    document.querySelectorAll('#syncModal .sstep').forEach(el => { el.hidden = el.dataset.step !== step; });
+    $('#syncTitle').textContent = step === 'on' ? 'Sync is on' : 'Sync across devices';
+    if (step === 'on') {
+      const when = cloud.lastPull ? new Date(cloud.lastPull).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+      $('#syncWho').textContent = `Signed in as ${cloud.user.email || 'you'}. ${cloud.state === 'offline' ? 'Offline right now: changes will upload when the connection is back.' : 'Your maps are in step across your devices' + (when ? ` (last checked ${when}).` : '.')}`;
+    }
+  }
+  function openSync() {
+    if (editing) commitEdit();
+    renderSyncPanel(); openModalEl('#syncModal');
+    const f = $('#syncModal .sstep:not([hidden]) input[type=email]'); if (f) setTimeout(() => f.focus(), 30);
+  }
+  function busy(on, text) { document.querySelectorAll('#syncModal button, #syncModal input').forEach(el => { if (!el.hasAttribute('data-close')) el.disabled = on; }); if (text !== undefined) syncMsg(text); }
+  function loadScript(src) { return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.async = true; sc.onload = res; sc.onerror = () => rej(new Error('load failed')); document.head.appendChild(sc); }); }
+
+  addEventListener('pageshow', e => { if (e.persisted) busy(false, ''); });   // back button from Google
+  async function initCloud() {
+    if (inArtifact || !/^https?:$/.test(location.protocol)) { $('#bSync').hidden = true; return; }
+    setCloud('off');
+    try { await loadScript(SB_LIB); } catch (e) { setCloud('error', 'Couldn’t load sync. Check your connection and reload.'); return; }
+    cloud.sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+    cloud.sb.auth.onAuthStateChange((event, session) => { setTimeout(() => onSession(session, event), 0); });
+    try { const { data } = await cloud.sb.auth.getSession(); await onSession(data && data.session, 'INITIAL'); } catch (e) {}
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && cloud.user && Date.now() - cloud.lastPull > 15000) pullAll(); });
+    addEventListener('online', () => { if (cloud.user) pullAll(); });
+  }
+  async function onSession(session, event) {
+    const u = session && session.user;
+    if (!u) { if (cloud.user) teardown(); cloud.user = null; setCloud('off'); return; }
+    if (cloud.user && cloud.user.id === u.id) return;
+    if (cloud.starting) return;
+    cloud.user = u; cloud.starting = true;
+    try {
+      subscribe();
+      await pullAll();
+      if (event === 'SIGNED_IN') toast(`Signed in as ${u.email || 'you'}. Your maps now sync across devices.`);
+    } finally { cloud.starting = false; }
+  }
+  function teardown() {
+    if (cloud.channel) { try { cloud.sb.removeChannel(cloud.channel); } catch (e) {} cloud.channel = null; }
+    clearTimeout(cloud.pushT);
+  }
+  function subscribe() {
+    if (cloud.channel || !cloud.sb.channel) return;
+    cloud.channel = cloud.sb.channel('mindsea-' + cloud.user.id)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'maps', filter: 'user_id=eq.' + cloud.user.id }, payload => { const row = payload && payload.new; if (row && row.id) queueApply(row); })
+      .subscribe();
+  }
+  let applyChain = Promise.resolve();
+  function queueApply(row) {
+    applyChain = applyChain.then(() => applyRemote(row)).then(() => { writeStore(); if (!$('#drawer').hidden) renderDrawer(); }).catch(() => {});
+  }
+
+  // newest change wins, map by map
+  async function applyRemote(row) {
+    if (!row || !row.id || !cloud.user) return;
+    if (row.id === store.current && saveT) persistNow();
+    const local = store.maps[row.id];
+    const lu = local ? (local.updated || 0) : (store.tomb[row.id] || 0), ru = Number(row.updated_ms) || 0;
+    if (ru <= lu) { if (ru < lu) markDirty(row.id, true); return 'kept'; }
+    if (row.deleted) { delete store.syncDirty[row.id]; store.tomb[row.id] = ru; if (local) dropLocal(row.id, true); return 'deleted'; }
+    if (!row.data || !row.data.map) {   // large rows can arrive without their body over the live channel
+      const { data, error } = await cloud.sb.from('maps').select('id,name,data,updated_ms,deleted').eq('id', row.id).maybeSingle();
+      if (error || !data) return; row = data;
+    }
+    const map = row.data && row.data.map;
+    if (!map || !map.nodes || !map.nodes[map.root]) return;
+    store.maps[row.id] = Object.assign(local || {}, { name: row.name || 'Untitled map', created: row.data.created || ru, updated: ru, data: map });
+    delete store.maps[row.id].sample;
+    lastSaved[row.id] = JSON.stringify(map);
+    delete store.syncDirty[row.id]; delete store.tomb[row.id];
+    if (row.id === store.current) reloadCurrent();
+    return 'updated';
+  }
+  function reloadCurrent() {
+    if (editing || labelEditing) return;   // finishing the edit will make this device's copy the newest
+    const keepCam = Object.assign({}, cam), keepSel = sel;
+    doc = JSON.parse(JSON.stringify(store.maps[store.current].data));
+    clearViews(); undo = []; redo = [];
+    sel = doc.nodes[keepSel] ? keepSel : null; msel = new Set(sel ? [sel] : []);
+    freshSpawn = true; sync({ nosave: true });
+    for (const k in views) { views[k].x = N(k).x; views[k].y = N(k).y; }
+    Object.assign(cam, keepCam); camGoal = null;
+    persistNow({ baseline: true });   // laying it out on screen isn't an edit
+    toast('Updated with changes from another device');
+  }
+  function dropLocal(id, remote) {
+    delete store.maps[id]; delete lastSaved[id];
+    if (id !== store.current) return;
+    store.current = null;
+    const rest = Object.keys(store.maps).sort((a, b) => (store.maps[b].updated || 0) - (store.maps[a].updated || 0));
+    if (rest.length) openMap(rest[0]);
+    else { const nid = uid(); store.maps[nid] = { name: 'Central idea', created: Date.now(), updated: Date.now(), data: makeDoc('Central idea') }; markDirty(nid, true); openMap(nid); }
+    if (remote) toast('That map was deleted on another device');
+  }
+
+  async function pullAll() {
+    if (!cloud.user || !cloud.sb) return;
+    setCloud('syncing');
+    const { data: rows, error } = await cloud.sb.from('maps').select('id,name,data,updated_ms,deleted');
+    if (error || !Array.isArray(rows)) { setCloud('offline'); return; }
+    const seen = new Set(); let gotMaps = false;
+    for (const row of rows) { seen.add(row.id); const r = await applyRemote(row); if (!row.deleted && (r === 'updated' || r === 'kept')) gotMaps = true; }
+    // an untouched sample map on a new device isn't worth uploading if the account already has maps
+    for (const id of Object.keys(store.maps)) {
+      if (seen.has(id)) continue;
+      if (store.maps[id].sample && gotMaps) dropLocal(id); else markDirty(id, true);
+    }
+    for (const id of Object.keys(store.tomb)) if (!seen.has(id) && !store.maps[id]) markDirty(id, true);
+    cloud.lastPull = Date.now(); writeStore();
+    if (!$('#drawer').hidden) renderDrawer();
+    await pushDirty();
+  }
+  async function pushDirty() {
+    if (!cloud.user || !cloud.sb) return;
+    if (cloud.pushing) { cloud.again = true; return; }
+    if (saveT) persistNow();
+    cloud.pushing = true;
+    try {
+      do {
+        cloud.again = false;
+        const ids = Object.keys(store.syncDirty);
+        if (ids.length) setCloud('syncing');
+        for (let i = 0; i < ids.length; i += 8) {
+          const rows = [];
+          for (const id of ids.slice(i, i + 8)) {
+            const m = store.maps[id];
+            if (m) rows.push({ id, user_id: cloud.user.id, name: m.name || '', deleted: false, updated_ms: m.updated || Date.now(), data: { created: m.created || null, map: m.data } });
+            else if (store.tomb[id]) rows.push({ id, user_id: cloud.user.id, name: '', deleted: true, updated_ms: store.tomb[id], data: {} });
+            else delete store.syncDirty[id];
+          }
+          if (!rows.length) continue;
+          const { error } = await cloud.sb.from('maps').upsert(rows, { onConflict: 'user_id,id' });
+          if (error) throw error;
+          for (const row of rows) {   // only clear it if nothing changed while it was uploading
+            const m = store.maps[row.id], now = m ? m.updated : store.tomb[row.id];
+            if (now === row.updated_ms) delete store.syncDirty[row.id];
+          }
+        }
+        writeStore();
+      } while (cloud.again);
+      setCloud('synced');
+    } catch (e) {
+      setCloud('offline');
+      clearTimeout(cloud.pushT); cloud.pushT = setTimeout(pushDirty, 30000);
+    } finally { cloud.pushing = false; }
+  }
+
+  $('#bSync').addEventListener('click', openSync);
+  $('#bGoogle').addEventListener('click', async () => {
+    if (!cloud.sb) return syncMsg('Sync isn’t available right now. Check your connection and reload.', true);
+    persistNow(); busy(true, 'Opening Google…');
+    const { error } = await cloud.sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: REDIRECT() } });
+    if (error) { busy(false); syncMsg(error.message, true); }
+    else setTimeout(() => busy(false, ''), 8000);   // in case the browser comes back here without signing in
+  });
+  $('#emailForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!cloud.sb) return syncMsg('Sync isn’t available right now. Check your connection and reload.', true);
+    const email = $('#syncEmail').value.trim();
+    busy(true, 'Sending…');
+    const { error } = await cloud.sb.auth.signInWithOtp({ email, options: { emailRedirectTo: REDIRECT() } });
+    busy(false);
+    if (error) syncMsg(/rate|seconds|too many/i.test(error.message) ? 'Too many sign-in emails just now. Wait a few minutes and try again.' : error.message, true);
+    else syncMsg(`Check ${email} for a sign-in link. Open it in this browser.`);
+  });
+  $('#bSyncNow').addEventListener('click', async () => { busy(true, 'Syncing…'); await pullAll(); busy(false, cloud.state === 'synced' ? 'All maps are in step.' : 'Couldn’t reach the sync server. Your maps are safe here.'); });
+  $('#bSignOut').addEventListener('click', async () => {
+    const clear = $('#signOutClear').checked;
+    persistNow(); busy(true, 'Signing out…');
+    await pushDirty();
+    teardown();
+    try { await cloud.sb.auth.signOut(); } catch (e) {}
+    cloud.user = null;
+    if (clear) {
+      store.maps = {}; store.syncDirty = {}; store.tomb = {}; store.current = null;
+      for (const k in lastSaved) delete lastSaved[k];
+      const nid = uid(); store.maps[nid] = { name: 'Central idea', created: Date.now(), updated: Date.now(), data: makeDoc('Central idea') }; openMap(nid);
+    }
+    busy(false, ''); setCloud('off'); closeModals();
+    toast(clear ? 'Signed out. This browser no longer has your maps.' : 'Signed out. Your maps stay in this browser.');
+  });
+
   /* ---------- boot ---------- */
   loadStore();
+  if (!store.syncDirty || typeof store.syncDirty !== 'object') store.syncDirty = {};
+  if (!store.tomb || typeof store.tomb !== 'object') store.tomb = {};
   auto = store.auto !== false; updateAuto();
   let firstVisit = false;
   if (!store.current || !store.maps[store.current]) {
     const ids = Object.keys(store.maps);
     if (ids.length) store.current = ids[0];
-    else { firstVisit = true; const id = uid(); store.maps[id] = { name: 'Sea of my mind', updated: Date.now(), data: sampleDoc() }; store.current = id; }
+    else { firstVisit = true; const id = uid(); store.maps[id] = { name: 'Sea of my mind', created: Date.now(), updated: Date.now(), data: sampleDoc(), sample: true }; store.current = id; }
   }
   const startId = store.current;
   store.current = null;
@@ -2095,12 +2369,13 @@ body.diving #grid { opacity: .25; }
   renderYours();
   for (const k in views) { views[k].x = N(k).x; views[k].y = N(k).y; }
   $('#mapName').textContent = mapLabel(startId);
-  if (firstVisit) persistNow(); else setSave('Saved');
+  persistNow({ baseline: true });
   if (!storageOK) setSave('Not saved: browser storage is off. Copy from the Logbook to keep it.', true);
   if (!reduce) { const goal = Object.assign({}, cam); cam.s *= .7; cam.x = innerWidth / 2 - (innerWidth / 2 - goal.x) * .7; cam.y = innerHeight / 2 - (innerHeight / 2 - goal.y) * .7; camGoal = goal; }
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { sync({ nosave: true }); if (!touched) fit(); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { sync({ nosave: true }); if (!saveT) persistNow({ baseline: true }); if (!touched) fit(); });
   addEventListener('resize', resize);
   requestAnimationFrame(frame);
+  initCloud();
   setTimeout(() => toast(firstVisit ? 'A sample map to start. Edit anything, or open Maps for a fresh one.' : 'Welcome back. Your sea is where you left it.'), 600);
 })();
 </script>
