@@ -2182,13 +2182,26 @@ body.diving #grid { opacity: .25; }
   function loadScript(src) { return new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = src; sc.async = true; sc.onload = res; sc.onerror = () => rej(new Error('load failed')); document.head.appendChild(sc); }); }
 
   addEventListener('pageshow', e => { if (e.persisted) busy(false, ''); });   // back button from Google
+  // a failed sign-in comes back with the reason in the address: turn it into a plain message
+  function readAuthError() {
+    const q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const code = h.get('error_code') || q.get('error_code') || h.get('error') || q.get('error');
+    if (!code) return '';
+    const desc = (h.get('error_description') || q.get('error_description') || '').replace(/\+/g, ' ');
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    if (/otp_expired/.test(code) || /expired|invalid/i.test(desc)) return 'This sign-in link has expired or was already used. Request a new one below.';
+    if (code === 'access_denied') return 'Sign-in was cancelled or not allowed. Try again.';
+    return `Sign-in didn’t work${desc ? ': ' + desc : ''}. Try again.`;
+  }
   async function initCloud() {
     if (inArtifact || !/^https?:$/.test(location.protocol)) { $('#bSync').hidden = true; return; }
     setCloud('off');
+    const authErr = readAuthError();
     try { await loadScript(SB_LIB); } catch (e) { setCloud('error', 'Couldn’t load sync. Check your connection and reload.'); return; }
     cloud.sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
     cloud.sb.auth.onAuthStateChange((event, session) => { setTimeout(() => onSession(session, event), 0); });
     try { const { data } = await cloud.sb.auth.getSession(); await onSession(data && data.session, 'INITIAL'); } catch (e) {}
+    if (authErr && !cloud.user) { openSync(); syncMsg(authErr, true); }
     document.addEventListener('visibilitychange', () => { if (!document.hidden && cloud.user && Date.now() - cloud.lastPull > 15000) pullAll(); });
     addEventListener('online', () => { if (cloud.user) pullAll(); });
   }
