@@ -349,7 +349,7 @@ body.diving #grid { opacity: .25; }
       <button class="key" id="bSync" type="button" title="Sync your maps across devices">Sign in</button>
       <button class="key" id="bMaps" type="button">Maps <kbd>M</kbd></button>
       <button class="key" id="bTidy" type="button" aria-haspopup="menu" aria-expanded="false">Tidy ▾</button>
-      <button class="key" id="bFit" type="button">Fit <kbd>F</kbd></button>
+      <button class="key" id="bFit" type="button">Fit <kbd>0</kbd></button>
       <button class="key on" id="bAuto" type="button" aria-pressed="true">Auto <kbd>A</kbd></button>
       <button class="key dl" id="bExport" type="button" aria-haspopup="menu" aria-expanded="false">Save as ▾</button>
       <button class="key" id="bLog" type="button">Logbook</button>
@@ -373,7 +373,7 @@ body.diving #grid { opacity: .25; }
     <button class="key" id="bLink" type="button">Link <kbd>L</kbd></button>
     <button class="key" id="bBox" type="button" aria-pressed="false">Select area <kbd>S</kbd></button>
     <button class="key" id="bEdit" type="button">Edit <kbd>Space</kbd></button>
-    <button class="key" id="bFold" type="button">Fold</button>
+    <button class="key" id="bFold" type="button">Fold <kbd>F</kbd></button>
     <button class="key" id="bUnfoldAll" type="button">Unfold all <kbd>U</kbd></button>
     <button class="key" id="bFoldAll" type="button">Fold all <kbd>⇧U</kbd></button>
     <span class="sep"></span>
@@ -506,7 +506,8 @@ body.diving #grid { opacity: .25; }
       <dt>D</dt><dd>Dive: focus one thought and let the rest fade</dd>
       <dt>T</dt><dd>Clean up: snap to the grid and fix overlaps, keeping your layout</dd>
       <dt>Shift + T</dt><dd>Arrange fresh. Both work around the selected idea, or the whole map when nothing is selected</dd>
-      <dt>F · A · M</dt><dd>Fit to screen · Auto-arrange · Maps</dd>
+      <dt>F</dt><dd>Fold or unfold the selected idea</dd>
+      <dt>0 · A · M</dt><dd>Fit to screen · Auto-arrange · Maps</dd>
       <dt>Ctrl/⌘ Z · Shift Z</dt><dd>Undo · Redo</dd>
       <dt>Sign in</dt><dd>Sync your maps across browsers and devices (website only)</dd>
       <dt>Ctrl/⌘ S</dt><dd>Open Save as. Pick a format with ↑ ↓ and press Enter; your last choice is highlighted, so ⌘S then Enter repeats it</dd>
@@ -1637,7 +1638,8 @@ body.diving #grid { opacity: .25; }
       case 'n': case 'N': addFreeCenter(); break;
       case 'd': case 'D': toggleDive(); break;
       case 't': case 'T': tidyNow(e.shiftKey ? 'arrange' : 'cleanup'); break;
-      case 'f': case 'F': fit(); break;
+      case 'f': case 'F': if (sel) toggleFold(sel); else toast('Select an idea first, then press F to fold or unfold it'); break;
+      case '0': fit(); break;
       case 'a': case 'A': toggleAuto(); break;
       case 'm': case 'M': $('#drawer').hidden ? openDrawer() : closeDrawer(); break;
       case '?': case '/': openModalEl('#helpModal'); break;
@@ -1654,7 +1656,7 @@ body.diving #grid { opacity: .25; }
     const sl = selLink && linkById(selLink);
     if (sl) $('#dockName').textContent = `${plain(N(sl.a).text)} ${ARROW[sl.dir]} ${plain(N(sl.b).text)}${sl.label ? ' · ' + sl.label : ''}`;
     $('#bFold').disabled = !has || !N(sel).kids.length;
-    $('#bFold').textContent = has && N(sel).collapsed ? 'Unfold' : 'Fold';
+    $('#bFold').innerHTML = (has && N(sel).collapsed ? 'Unfold' : 'Fold') + ' <kbd>F</kbd>';
     $('#bDel').disabled = !has || sel === doc.root;
     $('#bParent').disabled = !has || (msel.size < 2 && !N(sel).parent);
     if (msel.size > 1) $('#dockName').textContent = `${msel.size} ideas selected · + Parent groups them`;
