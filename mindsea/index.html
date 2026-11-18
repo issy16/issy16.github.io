@@ -1272,7 +1272,7 @@ body.diving #grid { opacity: .25; }
   // The sea is a soft backdrop, so it renders at 1x (pixelated) and redraws at ~30 fps;
   // the gradient, light rays and vignette are cached and only repainted when the depth changes.
   const SEA_FPS_MS = 33;
-  let seaDirty = true, lastSea = 0, bgK = -1, bgDive = null;
+  let seaDirty = true, lastSea = 0, bgK = -1, bgDive = null, bgAt = 0, bgBase = '#050914';
   const bgCanvas = document.createElement('canvas'), bgCtx = bgCanvas.getContext('2d');
   const vgCanvas = document.createElement('canvas'), vgCtx = vgCanvas.getContext('2d');
   const makeGlow = rgb => {
@@ -1281,6 +1281,11 @@ body.diving #grid { opacity: .25; }
     g.fillStyle = rg; g.fillRect(0, 0, 64, 64); return c;
   };
   const glowSprites = { '255,92,151': makeGlow('255,92,151'), '83,216,234': makeGlow('83,216,234') };
+  // Chrome can drop canvas memory (sleep, GPU reset, background tab): repaint when it comes back
+  const repaintSea = () => { bgK = -1; seaDirty = true; };
+  [canvas, bgCanvas, vgCanvas].forEach(c => c.addEventListener('contextrestored', repaintSea));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) repaintSea(); });
+  addEventListener('pageshow', repaintSea);
   function paintBackdrop(k) {
     bgCanvas.width = vgCanvas.width = W; bgCanvas.height = vgCanvas.height = Hh;
     const g = bgCtx.createLinearGradient(0, 0, 0, Hh);
@@ -1304,7 +1309,7 @@ body.diving #grid { opacity: .25; }
     const vg = vgCtx.createRadialGradient(W / 2, Hh / 2, Math.min(W, Hh) * (.3 - (diving ? .12 : 0)), W / 2, Hh / 2, Math.max(W, Hh) * .75);
     vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, `rgba(0,1,4,${.35 + .4 * k + (diving ? .2 : 0)})`);
     vgCtx.fillStyle = vg; vgCtx.fillRect(0, 0, W, Hh);
-    bgK = k; bgDive = !!diving;
+    bgK = k; bgDive = !!diving; bgAt = performance.now(); bgBase = mix([8, 23, 50], [3, 6, 16], k);
   }
   function resize() {
     dpr = 1; W = innerWidth; Hh = innerHeight; bgK = -1; seaDirty = true;
@@ -1344,8 +1349,11 @@ body.diving #grid { opacity: .25; }
     depthShown += (target - depthShown) * (reduce ? 1 : .07);
     if (Math.abs(target - depthShown) > .5) seaDirty = true;
     const k = depthShown / MAXDEPTH;
-    if (Math.abs(k - bgK) > .004 || bgDive !== !!diving) paintBackdrop(k);
+    // repaint the cached backdrop when the depth changes, and every 10 s in case the browser dropped it
+    if (Math.abs(k - bgK) > .004 || bgDive !== !!diving || now - bgAt > 10000) paintBackdrop(k);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // an opaque base first: if the cached backdrop is ever lost, old frames can't smear through as trails
+    ctx.globalAlpha = 1; ctx.fillStyle = bgBase; ctx.fillRect(0, 0, W, Hh);
     ctx.drawImage(bgCanvas, 0, 0);
 
     for (const p of parts) {
