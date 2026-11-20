@@ -11,8 +11,18 @@ Live at **https://issy16.github.io**.
 | [`/mindsea/`](https://issy16.github.io/mindsea/) | **Mindsea**, a deep-sea mind map app (beta). Sync via Supabase. |
 | [`/tutorme/guest/`](https://issy16.github.io/tutorme/guest/) | **TutorMe** demo with sample data. The real lesson log keeps its records encrypted in a private repo. |
 
-Related projects in their own repos:
+## Products
 
+One repo each, pinned on my profile:
+
+- **[mindsea](https://github.com/issy16/mindsea)**: the flagship and my first public launch
+- **[systemdesignlab](https://github.com/issy16/systemdesignlab)**: a learning and teaching tool
+- **[meowdoku](https://github.com/issy16/meowdoku)**: an algorithms project with a polished UI
+
+## Related projects in their own repos
+
+- [Mindsea](https://github.com/issy16/mindsea): a deep-sea mind map app ([try it](https://issy16.github.io/mindsea/))
+- [TutorMe](https://issy16.github.io/tutorme/guest/): lesson log and vocabulary notebook for tutoring (demo; the code repo is private)
 - [System Design Lab](https://github.com/issy16/systemdesignlab): learn system design by breaking a simulated ticket app
 - [Meowdoku Solver](https://github.com/issy16/meowdoku): constraint-satisfaction puzzle solver
 
