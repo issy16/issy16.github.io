@@ -2,7 +2,7 @@
 
 Software developer · UC Riverside, Computer Science ’25
 
-Live at  [𝒊𝒔𝒔𝒚.𝒈𝒊𝒕𝒉𝒖𝒃.𝒊𝒐](https://issy16.github.io/) 
+Live at  [𝒊𝒔𝒔𝒚𝟏𝟔.𝒈𝒊𝒕𝒉𝒖𝒃.𝒊𝒐](https://issy16.github.io/) 
 
 #### What I'm building
 
