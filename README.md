@@ -3,14 +3,6 @@
 Personal site of Isabel Chen, software developer (UC Riverside CS '25).
 Live at **https://issy16.github.io**.
 
-## What's here
-
-| Path | What it is |
-|---|---|
-| [`/`](https://issy16.github.io) | Resume and portfolio: about, skills, experience, projects, awards |
-| [`/mindsea/`](https://issy16.github.io/mindsea/) | **Mindsea**, a deep-sea mind map app (beta). Sync via Supabase. |
-| [`/tutorme/guest/`](https://issy16.github.io/tutorme/guest/) | **TutorMe** demo with sample data. The real lesson log keeps its records encrypted in a private repo. |
-
 ## Products
 
 - **[Mindsea](https://github.com/issy16/mindsea)**: a deep-sea mind map app, my flagship and first public launch ([try it](https://issy16.github.io/mindsea/))
