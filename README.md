@@ -1,16 +1,15 @@
-## issy16.github.io
+## Isabel Chen
 
-Personal site of Isabel Chen, software developer (UC Riverside CS ‘25).
-Live at 🌐 [issy16.github.io](https://issy16.github.io)
+Software developer · UC Riverside, Computer Science ’25
 
-📄 [Resume](https://issy16.github.io/Isabel_Chen_Resume_2026.pdf) · 💼 [LinkedIn](https://www.linkedin.com/in/isabelchen1) · ✉️ [tw.isabel@gmail.com](mailto:tw.isabel@gmail.com)
+Live at  [𝒊𝒔𝒔𝒚.𝒈𝒊𝒕𝒉𝒖𝒃.𝒊𝒐](https://issy16.github.io/) 
 
-### What I'm building
+#### What I'm building
 
-**🔵 [Mindsea](https://issy16.github.io/mindsea/)**: a deep-sea themed mind map maker. Branch out ideas, link opposites, and sink deeper as you zoom in. Sign in with Google to sync your maps across devices; edits made offline upload when you reconnect. *Early preview. Try it and tell me what you think!*
+[𝕄𝕀ℕ𝔻𝕊𝔼𝔸](https://issy16.github.io/mindsea/) a deep-sea themed mind map maker.
 
-**🔵 [System Design Lab](https://issy16.github.io/systemdesignlab/)**: learn system design by breaking a simulated concert ticket app, then fixing it.
+[𝑆𝑦𝑠𝑡𝑒𝑚 𝐷𝑒𝑠𝑖𝑔𝑛 𝐿𝑎𝑏](https://issy16.github.io/systemdesignlab/) learn system design.
 
-### Tools I use
+#### Tools I use
 
-JavaScript · HTML/CSS · Python · Supabase · GitHub Actions · Claude Code
+ Claude Code · JavaScript · HTML/CSS ·  Supabase
