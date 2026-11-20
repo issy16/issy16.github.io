@@ -15,16 +15,9 @@ Live at **https://issy16.github.io**.
 
 One repo each, pinned on my profile:
 
-- **[mindsea](https://github.com/issy16/mindsea)**: the flagship and my first public launch
-- **[systemdesignlab](https://github.com/issy16/systemdesignlab)**: a learning and teaching tool
-- **[meowdoku](https://github.com/issy16/meowdoku)**: an algorithms project with a polished UI
-
-## Related projects in their own repos
-
-- [Mindsea](https://github.com/issy16/mindsea): a deep-sea mind map app ([try it](https://issy16.github.io/mindsea/))
-- [TutorMe](https://issy16.github.io/tutorme/guest/): lesson log and vocabulary notebook for tutoring (demo; the code repo is private)
-- [System Design Lab](https://github.com/issy16/systemdesignlab): learn system design by breaking a simulated ticket app
-- [Meowdoku Solver](https://github.com/issy16/meowdoku): constraint-satisfaction puzzle solver
+- **[Mindsea](https://github.com/issy16/mindsea)**: a deep-sea mind map app, my flagship and first public launch ([try it](https://issy16.github.io/mindsea/))
+- **[System Design Lab](https://github.com/issy16/systemdesignlab)**: a learning and teaching tool; learn system design by breaking a simulated ticket app
+- **[Meowdoku Solver](https://github.com/issy16/meowdoku)**: an algorithms project with a polished UI; a constraint-satisfaction puzzle solver
 
 ## Structure
 
