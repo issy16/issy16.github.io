@@ -1,12 +1,30 @@
 # issy16.github.io
 
-Personal resume site for Isabel Chen, live at https://issy16.github.io.
+Personal site of Isabel Chen, software developer (UC Riverside CS '25).
+Live at **https://issy16.github.io**.
 
-A single static page with no build step:
+## What's here
 
-- `index.html`: page content
-- `css/pixel.css`: styles (pink pixel "music software" theme)
-- `img/`: portrait, favicon, and portfolio images
-- `vendor/fontawesome-free/`: icon font for the social buttons
+| Path | What it is |
+|---|---|
+| [`/`](https://issy16.github.io) | Resume and portfolio: about, skills, experience, projects, awards |
+| [`/mindsea/`](https://issy16.github.io/mindsea/) | **Mindsea**, a deep-sea mind map app (beta). Sync via Supabase. |
+| [`/tutorme/guest/`](https://issy16.github.io/tutorme/guest/) | **TutorMe** demo with sample data. The real lesson log keeps its records encrypted in a private repo. |
 
-Edit `index.html` and push to `main`; GitHub Pages republishes automatically.
+Related projects in their own repos:
+
+- [System Design Lab](https://github.com/issy16/systemdesignlab): learn system design by breaking a simulated ticket app
+- [Meowdoku Solver](https://github.com/issy16/meowdoku): constraint-satisfaction puzzle solver
+
+## Structure
+
+Static site, no build step. Push to `main` and GitHub Pages republishes.
+
+```
+index.html       resume page
+css/pixel.css    pink pixel "music software" theme
+js/eq-data.js    audio levels for the header equalizer
+img/  video/     portrait, gallery images, music video
+mindsea/         Mindsea app (single file)
+tutorme/         TutorMe app; guest/ is the same page in demo mode
+```
